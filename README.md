@@ -6,14 +6,17 @@ Es una plataforma para jugar online y competir por la mayor cantidad de puntos.
 
 Basado en /spec y /spec-impl
 
-Siguiendo las buenas practicas recomendadas aquí:
-https://github.com/Klerith/fernando-skills
-
 ## Skills usadas
 
 ```bash
 npx skills@latest add Klerith/fernando-skills
 ```
 
+## Commands
 
-## Hola mundo
+```bash
+npm run dev     # next dev (Turbopack)
+npm run build   # next build
+npm run start   # serve production build
+npm run lint    # eslint (flat config, eslint.config.mjs)
+```
