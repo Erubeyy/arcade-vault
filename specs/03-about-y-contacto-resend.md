@@ -1,6 +1,6 @@
 # SPEC 03 — Página About y formulario de contacto con Resend
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** SPEC 01, SPEC 02
 > **Fecha:** 2026-10-11
 > **Objetivo:** Reemplazar el placeholder de `/about` por la página About exacta del template `references/templates/home-about/` y hacer que su formulario de contacto envíe un correo real mediante Resend con una Server Action.
