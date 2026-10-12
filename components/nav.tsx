@@ -10,8 +10,10 @@ export function Nav() {
   const { user, signOut } = useSession();
   const [open, setOpen] = useState(false);
 
-  const isLibrary = pathname === "/" || pathname.startsWith("/juegos");
+  const isHome = pathname === "/";
+  const isLibrary = pathname.startsWith("/biblioteca") || pathname.startsWith("/juegos");
   const isHall = pathname.startsWith("/salon");
+  const isAbout = pathname.startsWith("/about");
   const isAuth = pathname.startsWith("/login");
   const close = () => setOpen(false);
 
@@ -25,8 +27,10 @@ export function Nav() {
           </div>
         </Link>
         <div className="links">
-          <Link className={isLibrary ? "active" : ""} href="/">Biblioteca</Link>
+          <Link className={isHome ? "active" : ""} href="/">Inicio</Link>
+          <Link className={isLibrary ? "active" : ""} href="/biblioteca">Biblioteca</Link>
           <Link className={isHall ? "active" : ""} href="/salon">Salón de la Fama</Link>
+          <Link className={isAbout ? "active" : ""} href="/about">Acerca de</Link>
         </div>
         <div className="spacer"></div>
         <div className="coin-counter">
@@ -46,8 +50,10 @@ export function Nav() {
       <div className={"av-mobile-backdrop" + (open ? " open" : "")} onClick={close}></div>
       <aside className={"av-mobile-panel" + (open ? " open" : "")}>
         <div className="pixel neon-cyan" style={{ fontSize: 11, marginBottom: 16 }}>MENÚ</div>
-        <Link className={isLibrary ? "active" : ""} href="/" onClick={close}>Biblioteca</Link>
+        <Link className={isHome ? "active" : ""} href="/" onClick={close}>Inicio</Link>
+        <Link className={isLibrary ? "active" : ""} href="/biblioteca" onClick={close}>Biblioteca</Link>
         <Link className={isHall ? "active" : ""} href="/salon" onClick={close}>Salón de la Fama</Link>
+        <Link className={isAbout ? "active" : ""} href="/about" onClick={close}>Acerca de</Link>
         {user ? (
           <a onClick={() => { close(); signOut(); }}>Cerrar sesión ({user.name})</a>
         ) : (
