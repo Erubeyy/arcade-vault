@@ -1,6 +1,6 @@
 # SPEC 02 — Página Home y link "Acerca de" en la nav
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** SPEC 01
 > **Fecha:** 2026-10-11
 > **Objetivo:** Crear la página Home en `/` copiando exactamente el diseño de `references/templates/home-about/`, mover la Biblioteca a `/biblioteca` y actualizar la nav con "Inicio" y "Acerca de" (este último apuntando a un placeholder mínimo).
