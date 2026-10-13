@@ -53,8 +53,12 @@ export default function Home() {
             Sin descargas. Sin costo. Solo diversión.
           </p>
           <div className="home-ctas">
-            <Link className="btn xl pulse" href="/biblioteca">▶  EXPLORAR JUEGOS</Link>
-            <Link className="btn xl magenta" href="/login">✦  CREAR CUENTA</Link>
+            <Link className="btn xl pulse" href="/biblioteca">
+              ▶ EXPLORAR JUEGOS
+            </Link>
+            <Link className="btn xl magenta" href="/login">
+              ✦ CREAR CUENTA
+            </Link>
           </div>
           <div className="hero-scroll" aria-hidden="true">
             <span>DESLIZA</span>
@@ -72,7 +76,11 @@ export default function Home() {
         </div>
         <div className="feature-grid">
           {FEATURES.map((f, i) => (
-            <div key={f.icon} className={"feature-card " + f.color} style={{ transitionDelay: i * 80 + "ms" }}>
+            <div
+              key={f.icon}
+              className={"feature-card " + f.color}
+              style={{ transitionDelay: i * 80 + "ms" }}
+            >
               <FeatureIcon kind={f.icon} />
               <div className="ft-title pixel">{f.title}</div>
               <div className="ft-desc">{f.desc}</div>
@@ -94,7 +102,9 @@ export default function Home() {
           ))}
         </div>
         <div style={{ textAlign: "center", marginTop: 24 }}>
-          <Link className="btn lg" href="/biblioteca">VER TODOS LOS JUEGOS →</Link>
+          <Link className="btn lg" href="/biblioteca">
+            VER TODOS LOS JUEGOS →
+          </Link>
         </div>
       </section>
 
@@ -102,7 +112,11 @@ export default function Home() {
       <section className="home-stats reveal">
         <div className="stats-inner">
           {STATS.map((st, i) => (
-            <div key={st.n} className="stat-block" style={{ transitionDelay: i * 90 + "ms" }}>
+            <div
+              key={st.n}
+              className="stat-block"
+              style={{ transitionDelay: i * 90 + "ms" }}
+            >
               <div className="stat-n neon-yellow">{st.n}</div>
               <div className="stat-u pixel">{st.u}</div>
               <div className="stat-s">{st.s}</div>
@@ -125,10 +139,16 @@ export default function Home() {
             </div>
             <div className="ticker">
               {RECENT_SCORES.map((r, i) => (
-                <div key={r.player} className="tick-row" style={{ animationDelay: i * 60 + "ms" }}>
+                <div
+                  key={r.player}
+                  className="tick-row"
+                  style={{ animationDelay: i * 60 + "ms" }}
+                >
                   <span className={"tk-p neon-" + r.color}>{r.player}</span>
                   <span className="tk-mid">▸ {r.game}</span>
-                  <span className="tk-s">+{r.score.toLocaleString("es-ES")}</span>
+                  <span className="tk-s">
+                    +{r.score.toLocaleString("es-ES")}
+                  </span>
                   <span className="tk-t">{r.when}</span>
                 </div>
               ))}
@@ -137,21 +157,41 @@ export default function Home() {
 
           <div className="activity-card">
             <div className="ac-head">
-              <div className="ac-title pixel neon-magenta">▸ TOP JUGADORES · HOY</div>
-              <Link className="lb-link" href="/salon">VER SALÓN →</Link>
+              <div className="ac-title pixel neon-magenta">
+                ▸ TOP JUGADORES · HOY
+              </div>
+              <Link className="lb-link" href="/salon">
+                VER SALÓN →
+              </Link>
             </div>
             <div className="top-list">
               {TOP_PLAYERS.map((r, i) => (
                 <div
                   key={r.player}
-                  className={"top-row" + (i === 0 ? " top1" : i === 1 ? " top2" : i === 2 ? " top3" : "")}
+                  className={
+                    "top-row" +
+                    (i === 0
+                      ? " top1"
+                      : i === 1
+                        ? " top2"
+                        : i === 2
+                          ? " top3"
+                          : "")
+                  }
                 >
-                  <span className="tp-rk">#{String(r.rank).padStart(2, "0")}</span>
+                  <span className="tp-rk">
+                    #{String(r.rank).padStart(2, "0")}
+                  </span>
                   <span className="tp-bar">
-                    <span className="tp-fill" style={{ width: 100 - i * 16 + "%" }}></span>
+                    <span
+                      className="tp-fill"
+                      style={{ width: 100 - i * 16 + "%" }}
+                    ></span>
                   </span>
                   <span className="tp-p">{r.player}</span>
-                  <span className="tp-s">{r.score.toLocaleString("es-ES")}</span>
+                  <span className="tp-s">
+                    {r.score.toLocaleString("es-ES")}
+                  </span>
                 </div>
               ))}
             </div>
@@ -180,7 +220,13 @@ export default function Home() {
                 <li key={p}>✔ {p}</li>
               ))}
             </ul>
-            <Link className="btn xl pulse" style={{ width: "100%" }} href="/login">EMPEZAR GRATIS →</Link>
+            <Link
+              className="btn xl pulse"
+              style={{ width: "100%" }}
+              href="/login"
+            >
+              EMPEZAR GRATIS →
+            </Link>
             <div className="pc-foot">No pedimos tarjeta. Nunca lo haremos.</div>
             <div className="pc-stamp pixel">
               FREE
@@ -203,8 +249,12 @@ export default function Home() {
       {/* FINAL CTA */}
       <section className="home-final reveal">
         <h2 className="final-title pixel">¿LISTO PARA JUGAR?</h2>
-        <Link className="btn xl pulse final-cta" href="/biblioteca">INSERTAR MONEDA →</Link>
-        <div className="final-tag">Gratis. Sin registro obligatorio. Empieza en segundos.</div>
+        <Link className="btn xl pulse final-cta" href="/biblioteca">
+          INSERTAR MONEDA →
+        </Link>
+        <div className="final-tag">
+          Gratis. Sin registro obligatorio. Empieza en segundos.
+        </div>
       </section>
     </div>
   );
