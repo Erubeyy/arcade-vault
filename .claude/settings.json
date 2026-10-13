@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_response.filePath // .tool_input.file_path'); cd \"$CLAUDE_PROJECT_DIR\" || exit 0; case \"$f\" in \"$CLAUDE_PROJECT_DIR\"/*) ;; *) exit 0;; esac; npx prettier --write --ignore-unknown \"$f\" 2>&1; case \"$f\" in *.js|*.jsx|*.ts|*.tsx|*.mjs|*.cjs) npx eslint --fix \"$f\" 2>&1;; esac; exit 0",
+            "timeout": 60,
+            "statusMessage": "Prettier + ESLint..."
+          }
+        ]
+      }
+    ]
+  }
+}
