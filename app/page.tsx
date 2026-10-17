@@ -3,7 +3,7 @@ import { FeatureIcon } from "@/components/home/feature-icon";
 import { FloatingSilhouettes } from "@/components/home/floating-silhouettes";
 import { MiniCard } from "@/components/home/mini-card";
 import { Reveal } from "@/components/home/reveal";
-import { GAMES } from "@/lib/games";
+import { getGames } from "@/lib/games";
 import { FEATURES, RECENT_SCORES, STATS, TOP_PLAYERS } from "@/lib/home-data";
 
 const FAQ = [
@@ -30,7 +30,8 @@ const PERKS = [
   "Funciona en cualquier navegador",
 ];
 
-export default function Home() {
+export default async function Home() {
+  const games = await getGames();
   return (
     <div className="home fade-in">
       <Reveal />
@@ -97,7 +98,7 @@ export default function Home() {
           <div className="section-rule"></div>
         </div>
         <div className="mini-rail">
-          {GAMES.slice(0, 6).map((g) => (
+          {games.slice(0, 6).map((g) => (
             <MiniCard key={g.id} game={g} />
           ))}
         </div>

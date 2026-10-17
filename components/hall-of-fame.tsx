@@ -2,18 +2,18 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { GAMES } from "@/lib/games";
+import type { Game } from "@/lib/games";
 import { seededScores } from "@/lib/scores";
 import { useSession } from "@/lib/session";
 
 const fmt = (n: number) => n.toLocaleString("es-ES");
 const top = (i: number) => (i === 0 ? " top1" : i === 1 ? " top2" : i === 2 ? " top3" : "");
 
-export function HallOfFame() {
+export function HallOfFame({ games }: { games: Game[] }) {
   const { user } = useSession();
-  const [tab, setTab] = useState(GAMES[0].id);
+  const [tab, setTab] = useState(games[0].id);
   const rows = useMemo(() => seededScores(tab.length * 23 + 7, 12), [tab]);
-  const game = GAMES.find((g) => g.id === tab) ?? GAMES[0];
+  const game = games.find((g) => g.id === tab) ?? games[0];
   const youRank = 8 + (tab.length % 4);
   const youScore = rows[5].score - 2400;
 
@@ -25,7 +25,7 @@ export function HallOfFame() {
       </div>
 
       <div className="hall-tabs">
-        {GAMES.map((g) => (
+        {games.map((g) => (
           <button key={g.id} className={"chip" + (tab === g.id ? " active" : "")} onClick={() => setTab(g.id)}>
             {g.title}
           </button>

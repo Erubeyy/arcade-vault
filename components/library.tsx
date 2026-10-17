@@ -1,17 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CATS, GAMES } from "@/lib/games";
+import { CATS } from "@/lib/categories";
+import type { Game } from "@/lib/games";
 import { GameCard } from "@/components/game-card";
 
-export function Library() {
+export function Library({ games }: { games: Game[] }) {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<(typeof CATS)[number]>("TODOS");
 
   const filtered = useMemo(() => {
     const term = q.toLowerCase();
-    return GAMES.filter((g) => (cat === "TODOS" || g.cat === cat) && g.title.toLowerCase().includes(term));
-  }, [q, cat]);
+    return games.filter((g) => (cat === "TODOS" || g.cat === cat) && g.title.toLowerCase().includes(term));
+  }, [games, q, cat]);
 
   return (
     <div className="fade-in">
