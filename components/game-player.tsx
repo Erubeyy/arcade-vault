@@ -126,6 +126,14 @@ export function GamePlayer({ gameId, title }: { gameId: string; title: string })
         </div>
       </div>
 
+      {isAsteroids && (
+        <ul className="controls-hint" aria-label="Controles">
+          <li><kbd>←</kbd><kbd>→</kbd> rotar</li>
+          <li><kbd>↑</kbd> propulsar</li>
+          <li><kbd className="wide">ESPACIO</kbd> disparar</li>
+        </ul>
+      )}
+
       {over && (
         <div className="modal-bd">
           <div className="modal">
