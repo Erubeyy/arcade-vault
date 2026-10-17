@@ -1,21 +1,83 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import type { Game } from "@/lib/games";
-import { seededScores } from "@/lib/scores-seed";
-import { useSession } from "@/lib/session";
+import { queryTopScores, type ScoreRow } from "@/lib/scores-query";
+import { useSession, type SavedScore } from "@/lib/session";
+import { createClient } from "@/lib/supabase/client";
 
 const fmt = (n: number) => n.toLocaleString("es-ES");
 const top = (i: number) => (i === 0 ? " top1" : i === 1 ? " top2" : i === 2 ? " top3" : "");
+const fmtDate = (ms: number) => {
+  const d = new Date(ms);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+};
+
+const SCORES_KEY = "av_scores";
+
+function subscribeScores(listener: () => void) {
+  window.addEventListener("storage", listener);
+  return () => window.removeEventListener("storage", listener);
+}
+function getLocalScores(): string | null {
+  try {
+    return localStorage.getItem(SCORES_KEY);
+  } catch {
+    return null;
+  }
+}
+const getServerLocalScores = (): string | null => null;
+
+type Result = { tab: string; rows: ScoreRow[]; failed: boolean };
+
+function PodiumSlot({ cls, num, row, big }: { cls: string; num: string; row?: ScoreRow; big?: boolean }) {
+  return (
+    <div className={"podium-slot " + cls}>
+      {big && (
+        <div className="pixel" style={{ fontSize: 9, color: "var(--gold)", letterSpacing: "0.18em" }}>CAMPEÓN</div>
+      )}
+      <div className="rank-num" style={big ? { fontSize: 36, marginTop: 4 } : undefined}>{num}</div>
+      <div className="name">{row ? row.name : "—"}</div>
+      <div className="score" style={big ? { fontSize: 20 } : undefined}>{row ? fmt(row.score) : "—"}</div>
+      <div className="date">{row ? row.date : "SIN MARCA"}</div>
+    </div>
+  );
+}
 
 export function HallOfFame({ games }: { games: Game[] }) {
   const { user } = useSession();
   const [tab, setTab] = useState(games[0].id);
-  const rows = useMemo(() => seededScores(tab.length * 23 + 7, 12), [tab]);
+  const [result, setResult] = useState<Result | null>(null);
+  const [supabase] = useState(() => createClient());
   const game = games.find((g) => g.id === tab) ?? games[0];
-  const youRank = 8 + (tab.length % 4);
-  const youScore = rows[5].score - 2400;
+
+  useEffect(() => {
+    let cancelled = false;
+    queryTopScores(supabase, tab, 10)
+      .then((rows) => !cancelled && setResult({ tab, rows, failed: false }))
+      .catch(() => !cancelled && setResult({ tab, rows: [], failed: true }));
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, tab]);
+
+  const loading = result?.tab !== tab;
+  const rows = loading || !result ? [] : result.rows;
+  const failed = !loading && !!result?.failed;
+
+  const rawLocal = useSyncExternalStore(subscribeScores, getLocalScores, getServerLocalScores);
+  const mine = (() => {
+    if (!rawLocal) return null;
+    try {
+      const all: SavedScore[] = JSON.parse(rawLocal);
+      return all
+        .filter((e) => e.game === tab)
+        .reduce<SavedScore | null>((best, e) => (!best || e.score > best.score ? e : best), null);
+    } catch {
+      return null;
+    }
+  })();
 
   return (
     <div className="av-hall fade-in">
@@ -33,25 +95,9 @@ export function HallOfFame({ games }: { games: Game[] }) {
       </div>
 
       <div className="podium">
-        <div className="podium-slot silver">
-          <div className="rank-num">02</div>
-          <div className="name">{rows[1].name}</div>
-          <div className="score">{fmt(rows[1].score)}</div>
-          <div className="date">{rows[1].date}</div>
-        </div>
-        <div className="podium-slot gold">
-          <div className="pixel" style={{ fontSize: 9, color: "var(--gold)", letterSpacing: "0.18em" }}>CAMPEÓN</div>
-          <div className="rank-num" style={{ fontSize: 36, marginTop: 4 }}>01</div>
-          <div className="name">{rows[0].name}</div>
-          <div className="score" style={{ fontSize: 20 }}>{fmt(rows[0].score)}</div>
-          <div className="date">{rows[0].date}</div>
-        </div>
-        <div className="podium-slot bronze">
-          <div className="rank-num">03</div>
-          <div className="name">{rows[2].name}</div>
-          <div className="score">{fmt(rows[2].score)}</div>
-          <div className="date">{rows[2].date}</div>
-        </div>
+        <PodiumSlot cls="silver" num="02" row={rows[1]} />
+        <PodiumSlot cls="gold" num="01" row={rows[0]} big />
+        <PodiumSlot cls="bronze" num="03" row={rows[2]} />
       </div>
 
       <div className="hall-table">
@@ -61,24 +107,42 @@ export function HallOfFame({ games }: { games: Game[] }) {
           <div>PUNTUACIÓN</div>
           <div>FECHA</div>
         </div>
+        {loading && (
+          <div className="tr" style={{ justifyContent: "center" }}>
+            <span className="pixel neon-cyan" style={{ fontSize: 11 }}>
+              CARGANDO <span className="blink">_</span>
+            </span>
+          </div>
+        )}
+        {failed && (
+          <div className="tr" style={{ display: "block", textAlign: "center", color: "var(--magenta)" }}>
+            No se pudieron cargar las marcas. Cambia de pestaña o recarga la página para reintentar.
+          </div>
+        )}
+        {!loading && !failed && rows.length === 0 && (
+          <div className="tr" style={{ display: "block", textAlign: "center", padding: "28px 12px", color: "var(--ink-faint)" }}>
+            <div className="pixel" style={{ fontSize: 12, color: "var(--magenta)", marginBottom: 8 }}>SIN MARCAS</div>
+            Nadie ha guardado una puntuación en {game.title} todavía.
+          </div>
+        )}
         {rows.map((r, i) => (
-          <div key={r.name + i} className={"tr" + top(i)} style={{ animationDelay: `${i * 50}ms` }}>
+          <div key={r.rank} className={"tr" + top(i)} style={{ animationDelay: `${i * 50}ms` }}>
             <div className="rk">#{String(r.rank).padStart(2, "0")}</div>
             <div className="pl">{r.name}</div>
             <div className="sc">{fmt(r.score)}</div>
             <div className="dt">{r.date}</div>
           </div>
         ))}
-        {user && (
+        {user && mine && (
           <>
             <div className="tr you-label">▸ TU MEJOR MARCA EN {game.title}</div>
-            <div className="tr you" style={{ animationDelay: `${rows.length * 50 + 50}ms` }}>
-              <div className="rk" style={{ color: "var(--yellow)" }}>#{String(youRank).padStart(2, "0")}</div>
-              <div className="pl" style={{ color: "var(--yellow)" }}>{user.name}</div>
+            <div className="tr you">
+              <div className="rk" style={{ color: "var(--yellow)" }}>—</div>
+              <div className="pl" style={{ color: "var(--yellow)" }}>{mine.name}</div>
               <div className="sc" style={{ color: "var(--yellow)", textShadow: "0 0 6px rgba(245,255,0,0.5)" }}>
-                {fmt(youScore)}
+                {fmt(mine.score)}
               </div>
-              <div className="dt">11/05/2026</div>
+              <div className="dt">{fmtDate(mine.at)}</div>
             </div>
           </>
         )}
