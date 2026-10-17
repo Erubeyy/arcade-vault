@@ -6,6 +6,7 @@ import { AsteroidsCanvas, type AsteroidsCanvasHandle } from "@/components/astero
 import type { AsteroidsStats } from "@/lib/games/asteroids/engine";
 import { useSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/client";
+import { revalidateScores } from "@/app/juegos/[id]/jugar/actions";
 
 const fmt = (n: number) => n.toLocaleString("es-ES");
 
@@ -81,7 +82,13 @@ export function GamePlayer({ gameId, title }: { gameId: string; title: string })
     const { error } = await createClient()
       .from("scores")
       .insert({ game_id: gameId, name: name.trim().toUpperCase().slice(0, 10), score });
-    setSaveState(error ? "error" : "saved");
+    if (error) {
+      setSaveState("error");
+      return;
+    }
+    setSaveState("saved");
+    // Si falla la revalidación la marca ya está guardada; las páginas se refrescan solas al caducar la caché.
+    revalidateScores(gameId).catch(() => {});
   };
 
   return (
