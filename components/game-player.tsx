@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AsteroidsCanvas, type AsteroidsCanvasHandle } from "@/components/asteroids-canvas";
+import type { AsteroidsStats } from "@/lib/games/asteroids/engine";
 import { useSession } from "@/lib/session";
 
 const fmt = (n: number) => n.toLocaleString("es-ES");
@@ -14,19 +16,48 @@ export function GamePlayer({ gameId, title }: { gameId: string; title: string })
   const [over, setOver] = useState(false);
   const [typedName, setTypedName] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [engineLevel, setEngineLevel] = useState(1);
+  const asteroidsRef = useRef<AsteroidsCanvasHandle>(null);
+  const isAsteroids = gameId === "asteroids";
 
   const name = typedName ?? user?.name ?? "INVITADO";
-  const level = 1 + Math.floor(score / 2500);
+  const level = isAsteroids ? engineLevel : 1 + Math.floor(score / 2500);
 
   useEffect(() => {
-    if (over || paused) return;
+    if (isAsteroids || over || paused) return;
     const t = setInterval(() => setScore((s) => s + Math.floor(10 + Math.random() * 90)), 220);
     return () => clearInterval(t);
-  }, [over, paused]);
+  }, [isAsteroids, over, paused]);
+
+  const handleStats = ({ score, lives, level }: AsteroidsStats) => {
+    setScore(score);
+    setLives(lives);
+    setEngineLevel(level);
+  };
+
+  const handleGameOver = (finalScore: number) => {
+    setScore(finalScore);
+    setOver(true);
+  };
+
+  const togglePause = () => {
+    if (isAsteroids) {
+      if (paused) asteroidsRef.current?.resume();
+      else asteroidsRef.current?.pause();
+    }
+    setPaused((p) => !p);
+  };
+
+  const finish = () => {
+    if (isAsteroids) asteroidsRef.current?.end();
+    else setOver(true);
+  };
 
   const restart = () => {
+    if (isAsteroids) asteroidsRef.current?.restart();
     setScore(0);
     setLives(3);
+    setEngineLevel(1);
     setPaused(false);
     setOver(false);
     setSaved(false);
@@ -54,21 +85,29 @@ export function GamePlayer({ gameId, title }: { gameId: string; title: string })
           </div>
         </div>
         <div className="hud-actions">
-          <button className="btn yellow" onClick={() => setPaused((p) => !p)}>{paused ? "REANUDAR" : "PAUSA"}</button>
-          <button className="btn magenta" onClick={() => setOver(true)}>FIN</button>
+          <button className="btn yellow" onClick={togglePause}>{paused ? "REANUDAR" : "PAUSA"}</button>
+          <button className="btn magenta" onClick={finish}>FIN</button>
           <Link className="btn ghost" href={`/juegos/${gameId}`}>SALIR</Link>
         </div>
       </div>
 
       <div className="crt">
         <div className="crt-screen">
-          <div className="game-arena">
-            <div className="grid-floor"></div>
-            <div className="enemy e1"></div>
-            <div className="enemy e2"></div>
-            <div className="enemy e3"></div>
-            <div className="player-ship"></div>
-          </div>
+          {isAsteroids ? (
+            <AsteroidsCanvas
+              ref={asteroidsRef}
+              onStats={handleStats}
+              onGameOver={handleGameOver}
+            />
+          ) : (
+            <div className="game-arena">
+              <div className="grid-floor"></div>
+              <div className="enemy e1"></div>
+              <div className="enemy e2"></div>
+              <div className="enemy e3"></div>
+              <div className="player-ship"></div>
+            </div>
+          )}
           {paused && (
             <div className="crt-content" style={{ background: "rgba(0,0,0,0.6)", zIndex: 5 }}>
               <div>
