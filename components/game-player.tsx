@@ -5,8 +5,12 @@ import { useEffect, useRef, useState } from "react";
 import { AsteroidsCanvas, type AsteroidsCanvasHandle } from "@/components/asteroids-canvas";
 import type { AsteroidsStats } from "@/lib/games/asteroids/engine";
 import { useSession } from "@/lib/session";
+import { createClient } from "@/lib/supabase/client";
+import { revalidateScores } from "@/app/juegos/[id]/jugar/actions";
 
 const fmt = (n: number) => n.toLocaleString("es-ES");
+
+type SaveState = "idle" | "saving" | "saved" | "error";
 
 export function GamePlayer({ gameId, title }: { gameId: string; title: string }) {
   const { user, saveScore } = useSession();
@@ -15,7 +19,8 @@ export function GamePlayer({ gameId, title }: { gameId: string; title: string })
   const [paused, setPaused] = useState(false);
   const [over, setOver] = useState(false);
   const [typedName, setTypedName] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const localSaved = useRef(false); // evita duplicar la copia local en av_scores al reintentar
   const [engineLevel, setEngineLevel] = useState(1);
   const asteroidsRef = useRef<AsteroidsCanvasHandle>(null);
   const isAsteroids = gameId === "asteroids";
@@ -60,7 +65,30 @@ export function GamePlayer({ gameId, title }: { gameId: string; title: string })
     setEngineLevel(1);
     setPaused(false);
     setOver(false);
-    setSaved(false);
+    setSaveState("idle");
+    localSaved.current = false;
+  };
+
+  const handleSave = async () => {
+    if (!localSaved.current) {
+      saveScore({ game: gameId, score, name });
+      localSaved.current = true;
+    }
+    if (!isAsteroids) {
+      setSaveState("saved");
+      return;
+    }
+    setSaveState("saving");
+    const { error } = await createClient()
+      .from("scores")
+      .insert({ game_id: gameId, name: name.trim().toUpperCase().slice(0, 10), score });
+    if (error) {
+      setSaveState("error");
+      return;
+    }
+    setSaveState("saved");
+    // Si falla la revalidación la marca ya está guardada; las páginas se refrescan solas al caducar la caché.
+    revalidateScores(gameId).catch(() => {});
   };
 
   return (
@@ -140,25 +168,24 @@ export function GamePlayer({ gameId, title }: { gameId: string; title: string })
             <h2>FIN DEL JUEGO</h2>
             <div className="final-label">PUNTUACIÓN FINAL</div>
             <div className="final">{fmt(score)}</div>
-            {!saved ? (
+            {saveState !== "saved" ? (
               <div className="input-row">
                 <input
                   value={name}
                   onChange={(e) => setTypedName(e.target.value.toUpperCase().slice(0, 10))}
                   placeholder="TUS INICIALES"
                 />
-                <button
-                  className="btn yellow"
-                  onClick={() => {
-                    saveScore({ game: gameId, score, name });
-                    setSaved(true);
-                  }}
-                >
-                  GUARDAR PUNTUACIÓN
+                <button className="btn yellow" onClick={handleSave} disabled={saveState === "saving"}>
+                  {saveState === "saving" ? "GUARDANDO…" : saveState === "error" ? "REINTENTAR" : "GUARDAR PUNTUACIÓN"}
                 </button>
               </div>
             ) : (
               <div className="toast-saved">▸ PUNTUACIÓN GUARDADA_</div>
+            )}
+            {saveState === "error" && (
+              <div role="alert" style={{ color: "var(--magenta)", fontSize: 12, marginTop: 10 }}>
+                No se pudo guardar en el ranking. Tu marca sigue en este dispositivo; revisa tu conexión y reintenta.
+              </div>
             )}
             <div className="actions">
               <button className="btn" onClick={restart}>JUGAR DE NUEVO</button>
