@@ -1,6 +1,6 @@
 # SPEC 06 — Tabla `games` y leaderboard real en Supabase
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** SPEC 04, SPEC 05
 > **Fecha:** 2026-10-16
 > **Objetivo:** Crear en Supabase las tablas `games` y `scores`, leer el catálogo de juegos desde `games` en toda la app y sustituir las puntuaciones sembradas del Salón de la Fama y del detalle de juego por un leaderboard real alimentado por las partidas de Asteroids.
