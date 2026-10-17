@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { Game } from "@/lib/games";
-import { seededScores } from "@/lib/scores";
+import { seededScores } from "@/lib/scores-seed";
 import { useSession } from "@/lib/session";
 
 const fmt = (n: number) => n.toLocaleString("es-ES");
