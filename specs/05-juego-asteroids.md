@@ -1,6 +1,6 @@
 # SPEC 05 — Juego Asteroids jugable dentro de Arcade Vault
 
-> **Estado:** Aprobado
+> **Estado:** implementado
 > **Depende de:** SPEC 01
 > **Fecha:** 2026-10-16
 > **Objetivo:** Portar el juego de `references/started-games/02-asteroids/` a TypeScript como un motor de canvas desacoplado y montarlo en la pantalla de juego como una entrada nueva `asteroids`, notificando a React la puntuación, las vidas, el nivel y el fin de partida.
