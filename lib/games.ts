@@ -102,6 +102,17 @@ export const GAMES: Game[] = [
     best: 24,
     plays: "4.2K",
   },
+  {
+    id: "asteroids",
+    title: "ASTEROIDS",
+    short: "Pulveriza asteroides y sobrevive al campo de rocas.",
+    long: "Rota tu nave con las flechas, propúlsala con inercia y dispara con ESPACIO para partir asteroides en fragmentos cada vez más pequeños. Recoge power-ups de disparo triple y escudo, y sobrevive nivel tras nivel en un mundo sin bordes.",
+    cat: "SHOOTER",
+    cover: "cover-rocas",
+    color: "cyan",
+    best: 9600,
+    plays: "1.2K",
+  },
 ];
 
 export const CATS = ["TODOS", "ARCADE", "PUZZLE", "SHOOTER", "VERSUS"] as const;
