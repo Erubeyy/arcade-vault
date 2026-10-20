@@ -128,20 +128,22 @@ export interface ThemeTokens {
   background: string; // --surface del tablero
   grid: string; // --grid
   ghostAlpha: number; // --ghost-alpha
+  label: string; // --muted: rótulo «SIGUIENTE» del panel
 }
 
 // Valores resueltos de style.css para cada combinación skin × tema. En la hoja
 // original `neon` se declara después de los temas y los pisa, así que no
 // distingue entre oscuro y claro; `pixel` no redefine nada y usa el tema base.
 const BASE: Record<TetrisTheme, ThemeTokens> = {
-  dark: { background: "#1a1a25", grid: "#22222e", ghostAlpha: 0.2 },
-  light: { background: "#ffffff", grid: "#e3e5ee", ghostAlpha: 0.4 },
+  dark: { background: "#1a1a25", grid: "#22222e", ghostAlpha: 0.2, label: "#555570" },
+  light: { background: "#ffffff", grid: "#e3e5ee", ghostAlpha: 0.4, label: "#6a6c85" },
 };
 
 const NEON: ThemeTokens = {
   background: "#05050a",
   grid: "#0b1a24",
   ghostAlpha: 0.35,
+  label: "#3f8aa0",
 };
 
 export const THEMES: Record<TetrisSkin, Record<TetrisTheme, ThemeTokens>> = {
@@ -149,7 +151,7 @@ export const THEMES: Record<TetrisSkin, Record<TetrisTheme, ThemeTokens>> = {
   pixel: BASE,
   neon: { dark: NEON, light: NEON },
   pastel: {
-    dark: { background: "#2a2838", grid: "#2b2940", ghostAlpha: 0.5 },
-    light: { background: "#ffffff", grid: "#f0e4ec", ghostAlpha: 0.5 },
+    dark: { background: "#2a2838", grid: "#2b2940", ghostAlpha: 0.5, label: "#555570" },
+    light: { background: "#ffffff", grid: "#f0e4ec", ghostAlpha: 0.5, label: "#6a6c85" },
   },
 };
