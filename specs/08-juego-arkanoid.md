@@ -1,6 +1,6 @@
 # SPEC 08 — Juego Arkanoid jugable dentro de Arcade Vault con leaderboard
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** SPEC 05, SPEC 06, SPEC 07
 > **Fecha:** 2026-10-19
 > **Objetivo:** Portar `references/started-games/04-arkanoid/` a TypeScript como un motor de canvas desacoplado con sprites, niveles y sonido, registrarlo en `REGISTRY` reemplazando el placeholder `bloque-buster` y guardar sus marcas en el leaderboard de Supabase.
