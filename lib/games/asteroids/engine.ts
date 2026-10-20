@@ -14,17 +14,7 @@ import {
   rand,
   type Keys,
 } from "./entities";
-
-export interface AsteroidsStats {
-  score: number;
-  lives: number;
-  level: number;
-}
-
-export interface AsteroidsCallbacks {
-  onStats: (stats: AsteroidsStats) => void;
-  onGameOver: (finalScore: number) => void;
-}
+import type { GameCallbacks, GameEngine, GameStats } from "../engine";
 
 type State = "playing" | "dead" | "gameover";
 
@@ -33,9 +23,9 @@ const TRIPLE_DURATION = 10; // segundos de disparo triple
 const SHIELD_DURATION = 5; // segundos de escudo temporal
 const GAME_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "Space"]);
 
-export class AsteroidsEngine {
+export class AsteroidsEngine implements GameEngine {
   private readonly ctx: CanvasRenderingContext2D;
-  private readonly callbacks: AsteroidsCallbacks;
+  private readonly callbacks: GameCallbacks;
 
   private keys: Keys = {};
   private justPressed: Keys = {};
@@ -60,9 +50,9 @@ export class AsteroidsEngine {
   private lastTime: number | null = null;
   private listening = false;
   private destroyed = false;
-  private lastStats: AsteroidsStats | null = null;
+  private lastStats: GameStats | null = null;
 
-  constructor(canvas: HTMLCanvasElement, callbacks: AsteroidsCallbacks) {
+  constructor(canvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D no disponible");
     this.ctx = ctx;
