@@ -2,6 +2,7 @@
 
 import { AsteroidsEngine } from "./asteroids/engine";
 import type { EngineFactory } from "./engine";
+import { TetrisEngine, W as TETRIS_W, H as TETRIS_H, type TetrisOptions } from "./tetris/engine";
 
 export interface GameDefinition {
   create: EngineFactory;
@@ -19,6 +20,19 @@ export const REGISTRY: Record<string, GameDefinition> = {
       { keys: ["←", "→"], label: "rotar" },
       { keys: ["↑"], label: "propulsar" },
       { keys: ["ESPACIO"], label: "disparar" },
+    ],
+  },
+  // Tetris reemplaza al placeholder `caida` del catálogo (SPEC 07): el id no cambia.
+  caida: {
+    create: (canvas, cb, options) =>
+      new TetrisEngine(canvas, cb, options as Partial<TetrisOptions> | undefined),
+    width: TETRIS_W,
+    height: TETRIS_H,
+    controls: [
+      { keys: ["←", "→"], label: "mover" },
+      { keys: ["↑", "X"], label: "rotar" },
+      { keys: ["↓"], label: "bajar" },
+      { keys: ["ESPACIO"], label: "caída" },
     ],
   },
 };

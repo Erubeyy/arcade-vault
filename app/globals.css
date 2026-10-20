@@ -1159,11 +1159,12 @@ a {
   letter-spacing: 0.12em;
 }
 
-/* real canvas games (see lib/games/registry.ts) */
+/* real canvas games (see lib/games/registry.ts); object-fit letterboxes non-4:3 canvases (Tetris 420x600) */
 .game-canvas {
   display: block;
   width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 
 /* fake in-screen game */
