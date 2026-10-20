@@ -1,7 +1,8 @@
 // Motor de Arkanoid portado de references/started-games/04-arkanoid/game.js.
 // Recibe un <canvas> y avisa a React por callbacks; no conoce React ni el DOM global.
 
-import type { GameCallbacks, GameStats } from "../engine";
+import type { GameCallbacks, GameEngine, GameStats } from "../engine";
+
 import { LEVELS, LEVEL_CHARS, type BlockColor } from "./levels";
 import {
   BALL_SPRITE,
@@ -10,6 +11,7 @@ import {
   EXPLOSION_FRAMES,
   PADDLE_SPRITE,
   drawFrame,
+  loadSpritesheet,
 } from "./sprites";
 
 export const W = 800;
@@ -27,6 +29,17 @@ const MAX_DT = 0.05; // s, evita saltos tras un lag
 const MAX_STEP_PX = 8; // máximo recorrido de la bola por sub-paso
 const LAUNCH_SPREAD = 15; // grados desde la vertical, al azar a cada lado
 const BG_COLOR = "#000";
+
+// Teclas que el motor captura. Las flechas y Space llevan preventDefault
+// (evitan el scroll de la página); A y D no desplazan nada.
+const PREVENT_KEYS = new Set([
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+  "Space",
+]);
+const GAME_KEYS = new Set([...PREVENT_KEYS, "KeyA", "KeyD"]);
 
 type State = "ready" | "playing" | "gameover";
 
@@ -46,7 +59,7 @@ interface Explosion {
   start: number; // ms (performance.now)
 }
 
-export class ArkanoidEngine {
+export class ArkanoidEngine implements GameEngine {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
   private readonly callbacks: GameCallbacks;
@@ -67,6 +80,13 @@ export class ArkanoidEngine {
   private lastStats: GameStats | null = null;
   private gameOverEmitted = false;
 
+  private started = false;
+  private paused = false;
+  private destroyed = false;
+  private listening = false;
+  private rafId: number | null = null;
+  private lastTime: number | null = null;
+
   constructor(canvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D no disponible");
@@ -77,6 +97,142 @@ export class ArkanoidEngine {
     this.canvas.height = H;
     this.blocks = this.createBlocks();
   }
+
+  // ── Ciclo de vida ───────────────────────────────────────────────────────────
+
+  start() {
+    if (this.destroyed || this.started) return;
+    this.started = true;
+    this.resetGame();
+    this.addListeners();
+    loadSpritesheet()
+      .then((img) => {
+        // destroy() pudo llegar mientras cargaba la imagen
+        if (this.destroyed) return;
+        this.img = img;
+        if (this.paused || this.state === "gameover") this.draw();
+        else this.startLoop();
+      })
+      .catch((err) => console.error(err));
+  }
+
+  pause() {
+    if (this.destroyed || this.paused) return;
+    this.paused = true;
+    this.pausedAt = performance.now();
+    // Una tecla soltada durante la pausa se quedaría «pulsada»
+    this.keys.clear();
+    this.stopLoop();
+    this.draw();
+  }
+
+  resume() {
+    if (this.destroyed || !this.paused) return;
+    this.paused = false;
+    // Las explosiones continúan donde se detuvieron
+    if (this.pausedAt !== null) {
+      const pausedFor = performance.now() - this.pausedAt;
+      for (const e of this.explosions) e.start += pausedFor;
+    }
+    this.pausedAt = null;
+    if (this.state !== "gameover") this.startLoop();
+  }
+
+  restart() {
+    if (this.destroyed) return;
+    this.paused = false;
+    this.pausedAt = null;
+    this.keys.clear();
+    this.stopLoop();
+    this.resetGame();
+    if (this.img) this.startLoop();
+  }
+
+  end() {
+    if (this.destroyed || this.state === "gameover") return;
+    this.stopLoop();
+    this.finish();
+    this.draw();
+  }
+
+  destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.stopLoop();
+    this.removeListeners();
+    this.keys.clear();
+  }
+
+  // ── Loop ────────────────────────────────────────────────────────────────────
+
+  private startLoop() {
+    if (this.rafId !== null || this.destroyed || this.state === "gameover") {
+      return;
+    }
+    this.lastTime = null; // evita un salto de dt tras pausar
+    this.rafId = requestAnimationFrame(this.loop);
+  }
+
+  private stopLoop() {
+    if (this.rafId !== null) cancelAnimationFrame(this.rafId);
+    this.rafId = null;
+  }
+
+  private loop = (now: number) => {
+    const dt =
+      this.lastTime === null
+        ? 0
+        : Math.min((now - this.lastTime) / 1000, MAX_DT);
+    this.lastTime = now;
+    this.update(dt);
+    this.draw();
+    // El fin de partida puede llegar dentro de este mismo frame: no se reprograma.
+    this.rafId =
+      this.state === "gameover" ? null : requestAnimationFrame(this.loop);
+  };
+
+  // ── Teclado ─────────────────────────────────────────────────────────────────
+
+  private addListeners() {
+    if (this.listening) return;
+    this.listening = true;
+    window.addEventListener("keydown", this.onKeyDown);
+    window.addEventListener("keyup", this.onKeyUp);
+  }
+
+  private removeListeners() {
+    if (!this.listening) return;
+    this.listening = false;
+    window.removeEventListener("keydown", this.onKeyDown);
+    window.removeEventListener("keyup", this.onKeyUp);
+  }
+
+  private onKeyDown = (e: KeyboardEvent) => {
+    // Al escribir iniciales o usar un selector, las teclas no llegan al juego.
+    const t = e.target;
+    if (
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLTextAreaElement ||
+      t instanceof HTMLSelectElement
+    )
+      return;
+    // Space sobre un botón enfocado lo activa; no debe además lanzar la bola.
+    if (e.code === "Space" && t instanceof HTMLButtonElement) return;
+
+    if (!GAME_KEYS.has(e.code)) return;
+    if (PREVENT_KEYS.has(e.code)) e.preventDefault();
+    if (this.paused || this.state === "gameover") return;
+
+    this.keys.add(e.code);
+    // El lanzamiento es una acción puntual: mantener la tecla no la encadena
+    if (e.code === "Space" && !e.repeat && this.state === "ready") {
+      this.launchBall();
+    }
+  };
+
+  private onKeyUp = (e: KeyboardEvent) => {
+    this.keys.delete(e.code);
+  };
 
   // Velocidad (px/s, magnitud constante) del nivel activo.
   private levelSpeed() {
