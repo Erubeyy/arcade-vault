@@ -1,9 +1,9 @@
 // Motor de Snake (SPEC 09). No tiene juego de referencia: las constantes se definen en el spec.
 // Recibe un <canvas> y avisa a React por callbacks; no conoce React ni el DOM global.
 
-import type { GameCallbacks, GameStats } from "../engine";
+import type { GameCallbacks, GameEngine, GameStats } from "../engine";
 
-import { FRUIT_NAMES, drawFruit, type FruitName } from "./sprites";
+import { FRUIT_NAMES, drawFruit, loadFruits, type FruitName } from "./sprites";
 
 export const W = 800;
 export const H = 600;
@@ -39,9 +39,28 @@ interface Fruit extends Cell {
   name: FruitName;
 }
 
+const UP: Cell = { x: 0, y: -1 };
+const DOWN: Cell = { x: 0, y: 1 };
+const LEFT: Cell = { x: -1, y: 0 };
 const RIGHT: Cell = { x: 1, y: 0 };
 
-export class SnakeEngine {
+// Teclas del juego. Todas giran la serpiente; las flechas además llevan
+// preventDefault (evitan el scroll de la página), WASD no desplaza nada.
+const ARROW_KEYS: Record<string, Cell> = {
+  ArrowUp: UP,
+  ArrowDown: DOWN,
+  ArrowLeft: LEFT,
+  ArrowRight: RIGHT,
+};
+const TURN_KEYS: Record<string, Cell> = {
+  ...ARROW_KEYS,
+  KeyW: UP,
+  KeyS: DOWN,
+  KeyA: LEFT,
+  KeyD: RIGHT,
+};
+
+export class SnakeEngine implements GameEngine {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
   private readonly callbacks: GameCallbacks;
@@ -62,6 +81,14 @@ export class SnakeEngine {
   private lastStats: GameStats | null = null;
   private gameOverEmitted = false;
 
+  private started = false;
+  private loaded = false; // terminó la carga del atlas (con o sin error)
+  private paused = false;
+  private destroyed = false;
+  private listening = false;
+  private rafId: number | null = null;
+  private lastTime: number | null = null;
+
   constructor(canvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D no disponible");
@@ -70,13 +97,137 @@ export class SnakeEngine {
     this.callbacks = callbacks;
     this.canvas.width = W;
     this.canvas.height = H;
-    this.resetGame();
+    this.initState();
   }
+
+  // ── Ciclo de vida ───────────────────────────────────────────────────────────
+
+  start() {
+    if (this.destroyed || this.started) return;
+    this.started = true;
+    this.resetGame();
+    this.addListeners();
+    loadFruits()
+      .then((img) => {
+        this.img = img;
+      })
+      // Sin atlas la fruta se dibuja como círculo y la partida sigue.
+      .catch((err) => console.error(err))
+      .then(() => {
+        // destroy() pudo llegar mientras cargaba la imagen
+        if (this.destroyed) return;
+        this.loaded = true;
+        if (this.paused || this.state === "gameover") this.draw();
+        else this.startLoop();
+      });
+  }
+
+  pause() {
+    if (this.destroyed || this.paused) return;
+    this.paused = true;
+    // Un giro pendiente durante la pausa se aplicaría de golpe al reanudar
+    this.queue = [];
+    this.stopLoop();
+    this.draw();
+  }
+
+  resume() {
+    if (this.destroyed || !this.paused) return;
+    this.paused = false;
+    this.accum = 0;
+    if (this.loaded && this.state !== "gameover") this.startLoop();
+  }
+
+  restart() {
+    if (this.destroyed) return;
+    this.paused = false;
+    this.stopLoop();
+    this.resetGame();
+    if (this.loaded) this.startLoop();
+    else this.draw();
+  }
+
+  end() {
+    if (this.destroyed || this.state === "gameover") return;
+    this.stopLoop();
+    this.finish();
+    this.draw();
+  }
+
+  destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.stopLoop();
+    this.removeListeners();
+    this.queue = [];
+  }
+
+  // ── Loop ────────────────────────────────────────────────────────────────────
+
+  private startLoop() {
+    if (this.rafId !== null || this.destroyed || this.state === "gameover") {
+      return;
+    }
+    this.lastTime = null; // evita un salto de dt tras pausar
+    this.rafId = requestAnimationFrame(this.loop);
+  }
+
+  private stopLoop() {
+    if (this.rafId !== null) cancelAnimationFrame(this.rafId);
+    this.rafId = null;
+  }
+
+  private loop = (now: number) => {
+    const dtMs = this.lastTime === null ? 0 : now - this.lastTime;
+    this.lastTime = now;
+    this.update(dtMs);
+    this.draw();
+    // El fin de partida puede llegar dentro de este mismo frame: no se reprograma.
+    this.rafId =
+      this.state === "gameover" ? null : requestAnimationFrame(this.loop);
+  };
+
+  // ── Teclado ─────────────────────────────────────────────────────────────────
+
+  private addListeners() {
+    if (this.listening) return;
+    this.listening = true;
+    window.addEventListener("keydown", this.onKeyDown);
+  }
+
+  private removeListeners() {
+    if (!this.listening) return;
+    this.listening = false;
+    window.removeEventListener("keydown", this.onKeyDown);
+  }
+
+  private onKeyDown = (e: KeyboardEvent) => {
+    // Al escribir iniciales o usar un selector, las teclas no llegan al juego.
+    const t = e.target;
+    if (
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLTextAreaElement ||
+      t instanceof HTMLSelectElement
+    )
+      return;
+
+    const dir = TURN_KEYS[e.code];
+    if (!dir) return;
+    if (e.code in ARROW_KEYS) e.preventDefault();
+    if (this.paused || this.state === "gameover") return;
+    this.queueTurn(dir);
+  };
 
   // ── Estado ──────────────────────────────────────────────────────────────────
 
-  // Serpiente de 3 segmentos en el centro, mirando a la derecha.
+  // Reinicia la partida y avisa a React.
   private resetGame() {
+    this.initState();
+    this.emitStats(true);
+  }
+
+  // Serpiente de 3 segmentos en el centro, mirando a la derecha.
+  private initState() {
     const cy = Math.floor(ROWS / 2);
     const cx = Math.floor(COLS / 2);
     this.snake = Array.from({ length: START_LENGTH }, (_, i) => ({
@@ -93,7 +244,6 @@ export class SnakeEngine {
     this.state = "playing";
     this.gameOverEmitted = false;
     this.spawnFruit();
-    this.emitStats(true);
   }
 
   // Encola un giro. Se descarta si repite o invierte (180°) la última dirección.
