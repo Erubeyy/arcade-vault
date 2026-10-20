@@ -1,6 +1,6 @@
 # SPEC 07 — Juego Tetris jugable dentro de Arcade Vault con leaderboard
 
-> **Estado:** Borrador
+> **Estado:** Aprobado
 > **Depende de:** SPEC 05, SPEC 06
 > **Fecha:** 2026-10-19
 > **Objetivo:** Portar `references/started-games/03-tetris/` a TypeScript como un motor de canvas desacoplado, registrarlo en un registro genérico de juegos, montarlo en la pantalla de juego reemplazando el placeholder `caida` y guardar sus marcas en el leaderboard de Supabase.
