@@ -42,6 +42,7 @@ export function GamePlayer({
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const localSaved = useRef(false); // evita duplicar la copia local en av_scores al reintentar
   const [engineLevel, setEngineLevel] = useState(1);
+  const abandoned = useRef(false);
   const canvasRef = useRef<GameCanvasHandle>(null);
   const isReal = isRealGame(gameId);
   const isTetris = gameId === "caida";
@@ -124,6 +125,24 @@ export function GamePlayer({
     setOver(false);
     setSaveState("idle");
     localSaved.current = false;
+  };
+
+  // Al volver a la página (los efectos se reejecutan al reaparecer desde la caché)
+  // arranca una partida nueva en vez de dejarla en pausa.
+  useEffect(() => {
+    if (!abandoned.current) return;
+    abandoned.current = false;
+    restart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Abandona la partida sin guardar: deja todo reiniciado y en pausa, porque la
+  // página puede conservarse en caché al navegar y reaparecer con el modal abierto.
+  const abandon = () => {
+    abandoned.current = true;
+    restart();
+    if (isReal) canvasRef.current?.pause();
+    setPaused(true);
   };
 
   const handleSave = async () => {
@@ -318,7 +337,18 @@ export function GamePlayer({
               <button className="btn" onClick={restart}>
                 JUGAR DE NUEVO
               </button>
-              <Link className="btn magenta" href="/biblioteca">
+              <Link
+                className="btn ghost"
+                href={`/juegos/${gameId}`}
+                onClick={abandon}
+              >
+                REGRESAR
+              </Link>
+              <Link
+                className="btn magenta"
+                href="/biblioteca"
+                onClick={abandon}
+              >
                 VOLVER AL VAULT
               </Link>
             </div>
