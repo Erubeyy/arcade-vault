@@ -3,6 +3,7 @@
 import { AsteroidsEngine } from "./asteroids/engine";
 import type { EngineFactory } from "./engine";
 import { ArkanoidEngine, type ArkanoidOptions } from "./arkanoid/engine";
+import { SnakeEngine, W as SNAKE_W, H as SNAKE_H } from "./snake/engine";
 import {
   TetrisEngine,
   W as TETRIS_W,
@@ -59,6 +60,16 @@ export const REGISTRY: Record<string, GameDefinition> = {
       { keys: ["←", "→"], label: "mover" },
       { keys: ["A", "D"], label: "mover" },
       { keys: ["ESPACIO"], label: "lanzar" },
+    ],
+  },
+  // Snake reemplaza al placeholder `serpentina` del catálogo (SPEC 09): el id no cambia.
+  serpentina: {
+    create: (canvas, cb) => new SnakeEngine(canvas, cb),
+    width: SNAKE_W,
+    height: SNAKE_H,
+    controls: [
+      { keys: ["←", "↑", "→", "↓"], label: "mover" },
+      { keys: ["W", "A", "S", "D"], label: "mover" },
     ],
   },
 };
