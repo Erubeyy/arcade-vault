@@ -126,6 +126,14 @@ export function GamePlayer({
     localSaved.current = false;
   };
 
+  // Abandona la partida sin guardar: deja todo reiniciado y en pausa, porque la
+  // página puede conservarse en caché al navegar y reaparecer con el modal abierto.
+  const abandon = () => {
+    restart();
+    if (isReal) canvasRef.current?.pause();
+    setPaused(true);
+  };
+
   const handleSave = async () => {
     if (!localSaved.current) {
       saveScore({ game: gameId, score, name });
@@ -318,10 +326,18 @@ export function GamePlayer({
               <button className="btn" onClick={restart}>
                 JUGAR DE NUEVO
               </button>
-              <Link className="btn ghost" href={`/juegos/${gameId}`}>
+              <Link
+                className="btn ghost"
+                href={`/juegos/${gameId}`}
+                onClick={abandon}
+              >
                 REGRESAR
               </Link>
-              <Link className="btn magenta" href="/biblioteca">
+              <Link
+                className="btn magenta"
+                href="/biblioteca"
+                onClick={abandon}
+              >
                 VOLVER AL VAULT
               </Link>
             </div>
