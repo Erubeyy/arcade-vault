@@ -5,9 +5,19 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { GameCanvas, type GameCanvasHandle } from "@/components/game-canvas";
 import type { GameStats } from "@/lib/games/engine";
 import { REGISTRY, isRealGame } from "@/lib/games/registry";
+import {
+  ArkanoidEngine,
+  type ArkanoidOptions,
+} from "@/lib/games/arkanoid/engine";
+import {
+  DEFAULT_PREFS as ARKANOID_DEFAULT_PREFS,
+  loadPrefs as loadArkanoidPrefs,
+  savePrefs as saveArkanoidPrefs,
+} from "@/lib/games/arkanoid/prefs";
 import { TetrisEngine, type TetrisOptions } from "@/lib/games/tetris/engine";
 import { DEFAULT_PREFS, loadPrefs, savePrefs } from "@/lib/games/tetris/prefs";
 import { TetrisOptionsPanel } from "@/components/tetris-options";
+import { ArkanoidOptionsPanel } from "@/components/arkanoid-options";
 import { useSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/client";
 import { revalidateScores } from "@/app/juegos/[id]/jugar/actions";
@@ -35,6 +45,7 @@ export function GamePlayer({
   const canvasRef = useRef<GameCanvasHandle>(null);
   const isReal = isRealGame(gameId);
   const isTetris = gameId === "caida";
+  const isArkanoid = gameId === "bloque-buster";
   // Las preferencias salen de localStorage, que el servidor no tiene: el panel y el
   // motor solo se montan tras la hidratación (`mounted`) para no desajustarla.
   const mounted = useSyncExternalStore(
@@ -44,6 +55,10 @@ export function GamePlayer({
   );
   const [tetrisPrefs, setTetrisPrefs] = useState<TetrisOptions>(() =>
     isTetris ? loadPrefs() : DEFAULT_PREFS,
+  );
+
+  const [arkanoidPrefs, setArkanoidPrefs] = useState<ArkanoidOptions>(() =>
+    isArkanoid ? loadArkanoidPrefs() : ARKANOID_DEFAULT_PREFS,
   );
 
   const name = typedName ?? user?.name ?? "INVITADO";
@@ -67,6 +82,13 @@ export function GamePlayer({
       engine.setTheme(next.theme);
       engine.setStartLevel(next.startLevel);
     }
+  };
+
+  const handleArkanoidPrefs = (next: ArkanoidOptions) => {
+    setArkanoidPrefs(next);
+    saveArkanoidPrefs(next);
+    const engine = canvasRef.current?.engine();
+    if (engine instanceof ArkanoidEngine) engine.setMuted(next.muted);
   };
 
   const handleStats = ({ score, lives, level }: GameStats) => {
@@ -172,16 +194,28 @@ export function GamePlayer({
             onChange={handleTetrisPrefs}
           />
         )}
+        {isArkanoid && mounted && (
+          <ArkanoidOptionsPanel
+            value={arkanoidPrefs}
+            onChange={handleArkanoidPrefs}
+          />
+        )}
       </div>
 
       <div className="crt">
         <div className="crt-screen">
           {isReal ? (
-            (!isTetris || mounted) && (
+            ((!isTetris && !isArkanoid) || mounted) && (
               <GameCanvas
                 ref={canvasRef}
                 gameId={gameId}
-                options={isTetris ? tetrisPrefs : undefined}
+                options={
+                  isTetris
+                    ? tetrisPrefs
+                    : isArkanoid
+                      ? arkanoidPrefs
+                      : undefined
+                }
                 onStats={handleStats}
                 onGameOver={handleGameOver}
               />
