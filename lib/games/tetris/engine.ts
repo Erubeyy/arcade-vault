@@ -1,7 +1,7 @@
 // Motor de Tetris portado de references/started-games/03-tetris/game.js.
 // Recibe un <canvas> y avisa a React por callbacks; no conoce React ni el DOM global.
 
-import type { GameCallbacks, GameStats } from "../engine";
+import type { GameCallbacks, GameEngine, GameStats } from "../engine";
 import {
   BLOCK,
   COLS,
@@ -37,6 +37,16 @@ const PANEL_W = 120;
 export const W = BOARD_W + PANEL_W; // 420
 export const H = ROWS * BLOCK; // 600
 
+// Teclas que el motor captura. Solo las flechas y Space llevan preventDefault
+// (evitan el scroll de la página); KeyX no desplaza nada.
+const PREVENT_KEYS = new Set([
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowDown",
+  "ArrowUp",
+  "Space",
+]);
+
 const DEFAULTS: TetrisOptions = { skin: "retro", theme: "dark", startLevel: 1 };
 
 function clampLevel(value: unknown): number {
@@ -46,7 +56,7 @@ function clampLevel(value: unknown): number {
     : DEFAULTS.startLevel;
 }
 
-export class TetrisEngine {
+export class TetrisEngine implements GameEngine {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly callbacks: GameCallbacks;
 
@@ -55,8 +65,8 @@ export class TetrisEngine {
   private startLevel: number;
 
   private board: number[][] = createBoard();
-  private current!: Piece;
-  private next!: Piece;
+  private current: Piece = randomPiece();
+  private next: Piece = randomPiece();
 
   private score = 0;
   private lines = 0;
@@ -66,6 +76,10 @@ export class TetrisEngine {
   private gameOver = false;
   private gameOverEmitted = false;
 
+  private rafId: number | null = null;
+  private lastTime: number | null = null;
+  private paused = false;
+  private listening = false;
   private destroyed = false;
   private lastStats: GameStats | null = null;
 
@@ -86,12 +100,141 @@ export class TetrisEngine {
       ? (options!.theme as TetrisTheme)
       : DEFAULTS.theme;
     this.startLevel = clampLevel(options?.startLevel);
+  }
+
+  // ── Ciclo de vida ───────────────────────────────────────────────────────────
+
+  start() {
+    if (this.destroyed) return;
     this.initGame();
+    this.addListeners();
+    this.startLoop();
+  }
+
+  pause() {
+    this.paused = true;
+    this.stopLoop();
+  }
+
+  resume() {
+    if (this.destroyed || this.gameOver) return;
+    this.paused = false;
+    this.startLoop();
+  }
+
+  restart() {
+    if (this.destroyed) return;
+    this.paused = false;
+    this.initGame();
+    this.startLoop();
+  }
+
+  end() {
+    if (this.destroyed || this.gameOver) return;
+    this.gameOver = true;
+    this.stopLoop();
+    this.draw();
+    this.settle();
   }
 
   destroy() {
+    if (this.destroyed) return;
     this.destroyed = true;
+    this.stopLoop();
+    this.removeListeners();
   }
+
+  // ── Opciones en vivo ────────────────────────────────────────────────────────
+
+  setSkin(skin: TetrisSkin) {
+    if (!SKIN_NAMES.includes(skin)) return;
+    this.skin = skin;
+    if (!this.destroyed) this.draw(); // repinta aunque esté en pausa o terminada
+  }
+
+  setTheme(theme: TetrisTheme) {
+    if (!THEME_NAMES.includes(theme)) return;
+    this.theme = theme;
+    if (!this.destroyed) this.draw();
+  }
+
+  // Se aplica en el próximo start() o restart(); la partida en curso no cambia.
+  setStartLevel(level: number) {
+    this.startLevel = clampLevel(level);
+  }
+
+  // ── Loop ────────────────────────────────────────────────────────────────────
+
+  private startLoop() {
+    if (this.rafId !== null || this.gameOver) return;
+    this.lastTime = null; // evita un salto de tiempo tras pausar
+    this.rafId = requestAnimationFrame(this.loop);
+  }
+
+  private stopLoop() {
+    if (this.rafId !== null) cancelAnimationFrame(this.rafId);
+    this.rafId = null;
+  }
+
+  private loop = (ts: number) => {
+    const dt = this.lastTime === null ? 0 : ts - this.lastTime;
+    this.lastTime = ts;
+    this.tick(dt);
+    this.draw();
+    // El fin de partida puede llegar dentro de este mismo frame: no se reprograma.
+    this.rafId = this.gameOver ? null : requestAnimationFrame(this.loop);
+  };
+
+  // ── Teclado ─────────────────────────────────────────────────────────────────
+
+  private addListeners() {
+    if (this.listening) return;
+    this.listening = true;
+    window.addEventListener("keydown", this.onKeyDown);
+  }
+
+  private removeListeners() {
+    if (!this.listening) return;
+    this.listening = false;
+    window.removeEventListener("keydown", this.onKeyDown);
+  }
+
+  private onKeyDown = (e: KeyboardEvent) => {
+    // Al escribir iniciales o usar un selector, las teclas no llegan al juego.
+    const t = e.target;
+    if (
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLTextAreaElement ||
+      t instanceof HTMLSelectElement
+    )
+      return;
+    // Space sobre un botón enfocado lo activa; no debe además provocar una caída dura.
+    if (e.code === "Space" && t instanceof HTMLButtonElement) return;
+
+    const isGameKey = PREVENT_KEYS.has(e.code) || e.code === "KeyX";
+    if (!isGameKey) return;
+    if (PREVENT_KEYS.has(e.code)) e.preventDefault();
+    if (this.paused || this.gameOver) return;
+
+    switch (e.code) {
+      case "ArrowLeft":
+        this.moveHorizontal(-1);
+        break;
+      case "ArrowRight":
+        this.moveHorizontal(1);
+        break;
+      case "ArrowDown":
+        this.softDrop();
+        break;
+      case "ArrowUp":
+      case "KeyX":
+        this.rotate();
+        break;
+      case "Space":
+        this.hardDrop();
+        break;
+    }
+  };
 
   // ── Estado del juego ────────────────────────────────────────────────────────
 
