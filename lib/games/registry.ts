@@ -2,7 +2,13 @@
 
 import { AsteroidsEngine } from "./asteroids/engine";
 import type { EngineFactory } from "./engine";
-import { TetrisEngine, W as TETRIS_W, H as TETRIS_H, type TetrisOptions } from "./tetris/engine";
+import { ArkanoidEngine, type ArkanoidOptions } from "./arkanoid/engine";
+import {
+  TetrisEngine,
+  W as TETRIS_W,
+  H as TETRIS_H,
+  type TetrisOptions,
+} from "./tetris/engine";
 
 export interface GameDefinition {
   create: EngineFactory;
@@ -25,7 +31,11 @@ export const REGISTRY: Record<string, GameDefinition> = {
   // Tetris reemplaza al placeholder `caida` del catálogo (SPEC 07): el id no cambia.
   caida: {
     create: (canvas, cb, options) =>
-      new TetrisEngine(canvas, cb, options as Partial<TetrisOptions> | undefined),
+      new TetrisEngine(
+        canvas,
+        cb,
+        options as Partial<TetrisOptions> | undefined,
+      ),
     width: TETRIS_W,
     height: TETRIS_H,
     controls: [
@@ -33,6 +43,22 @@ export const REGISTRY: Record<string, GameDefinition> = {
       { keys: ["↑", "X"], label: "rotar" },
       { keys: ["↓"], label: "bajar" },
       { keys: ["ESPACIO"], label: "caída" },
+    ],
+  },
+  // Arkanoid reemplaza al placeholder `bloque-buster` del catálogo (SPEC 08): el id no cambia.
+  "bloque-buster": {
+    create: (canvas, cb, options) =>
+      new ArkanoidEngine(
+        canvas,
+        cb,
+        options as Partial<ArkanoidOptions> | undefined,
+      ),
+    width: 800,
+    height: 600,
+    controls: [
+      { keys: ["←", "→"], label: "mover" },
+      { keys: ["A", "D"], label: "mover" },
+      { keys: ["ESPACIO"], label: "lanzar" },
     ],
   },
 };

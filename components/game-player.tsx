@@ -229,7 +229,7 @@ export function GamePlayer({
       {isReal && (
         <ul className="controls-hint" aria-label="Controles">
           {REGISTRY[gameId].controls.map(({ keys, label }) => (
-            <li key={label}>
+            <li key={`${label}-${keys.join("")}`}>
               {keys.map((k) => (
                 <kbd key={k} className={k.length > 2 ? "wide" : undefined}>
                   {k}
