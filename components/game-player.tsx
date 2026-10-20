@@ -166,6 +166,12 @@ export function GamePlayer({
             SALIR
           </Link>
         </div>
+        {isTetris && mounted && (
+          <TetrisOptionsPanel
+            value={tetrisPrefs}
+            onChange={handleTetrisPrefs}
+          />
+        )}
       </div>
 
       <div className="crt">
@@ -233,10 +239,6 @@ export function GamePlayer({
             </li>
           ))}
         </ul>
-      )}
-
-      {isTetris && mounted && (
-        <TetrisOptionsPanel value={tetrisPrefs} onChange={handleTetrisPrefs} />
       )}
 
       {over && (

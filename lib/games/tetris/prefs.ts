@@ -13,6 +13,8 @@ export const DEFAULT_PREFS: TetrisOptions = {
 };
 
 export function loadPrefs(): TetrisOptions {
+  // En el prerenderizado del servidor no hay localStorage.
+  if (typeof window === "undefined") return DEFAULT_PREFS;
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     if (!raw) return DEFAULT_PREFS;

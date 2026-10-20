@@ -16,6 +16,8 @@ interface TetrisOptionsPanelProps {
   onChange: (next: TetrisOptions) => void;
 }
 
+// Segunda fila de la barra `.player-hud`: mismas etiquetas (`.l`) y mismo
+// lenguaje visual que las estadísticas y los botones de la barra.
 export function TetrisOptionsPanel({
   value,
   onChange,
@@ -23,14 +25,11 @@ export function TetrisOptionsPanel({
   const light = value.theme === "light";
 
   return (
-    <div
-      className="tetris-options"
-      role="group"
-      aria-label="Opciones de Tetris"
-    >
-      <label>
-        <span>Skin</span>
+    <div className="hud-options" role="group" aria-label="Opciones de Tetris">
+      <label className="hud-stat">
+        <span className="l">Skin</span>
         <select
+          className="hud-select"
           value={value.skin}
           onChange={(e) => {
             onChange({ ...value, skin: e.target.value as TetrisSkin });
@@ -45,21 +44,26 @@ export function TetrisOptionsPanel({
         </select>
       </label>
 
-      <button
-        type="button"
-        role="switch"
-        aria-checked={light}
-        onClick={(e) => {
-          onChange({ ...value, theme: light ? "dark" : "light" });
-          e.currentTarget.blur(); // si no, ESPACIO volvería a pulsar el botón
-        }}
-      >
-        Tablero {light ? "claro" : "oscuro"}
-      </button>
+      <div className="hud-stat">
+        <span className="l">Tema del tablero</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={light}
+          className="btn magenta hud-toggle"
+          onClick={(e) => {
+            onChange({ ...value, theme: light ? "dark" : "light" });
+            e.currentTarget.blur(); // si no, ESPACIO volvería a pulsar el botón
+          }}
+        >
+          {light ? "CLARO" : "OSCURO"}
+        </button>
+      </div>
 
-      <label>
-        <span>Nivel inicial</span>
+      <label className="hud-stat">
+        <span className="l">Nivel inicial · próxima partida</span>
         <select
+          className="hud-select yellow"
           value={value.startLevel}
           onChange={(e) => {
             onChange({ ...value, startLevel: Number(e.target.value) });
@@ -68,11 +72,10 @@ export function TetrisOptionsPanel({
         >
           {LEVELS.map((n) => (
             <option key={n} value={n}>
-              {n}
+              {String(n).padStart(2, "0")}
             </option>
           ))}
         </select>
-        <small>desde la próxima partida</small>
       </label>
     </div>
   );

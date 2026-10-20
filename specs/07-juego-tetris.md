@@ -1,6 +1,6 @@
 # SPEC 07 — Juego Tetris jugable dentro de Arcade Vault con leaderboard
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** SPEC 05, SPEC 06
 > **Fecha:** 2026-10-19
 > **Objetivo:** Portar `references/started-games/03-tetris/` a TypeScript como un motor de canvas desacoplado, registrarlo en un registro genérico de juegos, montarlo en la pantalla de juego reemplazando el placeholder `caida` y guardar sus marcas en el leaderboard de Supabase.
@@ -26,7 +26,7 @@ El código original (`game.js`, ~590 líneas) usa globals de módulo, toca el DO
 - 4 skins del original (`retro`, `neon`, `pastel`, `pixel`) con su paleta y su función de dibujo de bloque.
 - Tema del canvas claro/oscuro: solo cambia el fondo, el color de la rejilla y el alpha del fantasma dentro del canvas. El sitio no cambia de tema.
 - Nivel inicial de 1 a 10: se aplica al iniciar o reiniciar la partida.
-- Panel `components/tetris-options.tsx` bajo la pantalla CRT, solo para `tetris`, con select de skin, toggle de tema y select de nivel inicial. Skin y tema se aplican en vivo; el nivel inicial, al siguiente JUGAR DE NUEVO.
+- Panel `components/tetris-options.tsx` en una segunda fila de la barra `.player-hud`, solo para `caida`, con select de skin, toggle de tema y select de nivel inicial, con el mismo diseño y colores que el resto de la barra (etiquetas `.l`, fuente pixel, bordes achaflanados). Skin y tema se aplican en vivo; el nivel inicial, al siguiente JUGAR DE NUEVO.
 - Preferencias en `localStorage` bajo la clave `av_tetris_prefs`; si falla, valores por defecto (`retro`, `dark`, nivel 1).
 - Migración `supabase/migrations/<timestamp>_game_tetris.sql`: UPDATE del placeholder `caida` conservando `id` y `position`.
 - Guardado en `scores` (`game_id = 'caida'`) + copia local `av_scores` + `revalidateScores`, con los estados guardando, guardado y error con reintento (patrón del SPEC 06).
@@ -164,7 +164,7 @@ Antes de empezar, leer en `node_modules/next/dist/docs/01-app/` las guías de Se
 3. `lib/games/tetris/engine.ts`: estado encapsulado (tablero, pieza actual, siguiente, `score`, `lines`, `level`, `dropAccum`, `dropInterval`), `collide`, `tryRotate`, `lockPiece`, `clearLines`, `spawn`, hard y soft drop, `draw` de tablero, fantasma y pieza, y panel «SIGUIENTE». Verificación: compila; `destroy()` dos veces no lanza error.
 4. Entrada de teclado, callbacks y ciclo de vida (`start`, `pause`, `resume`, `restart`, `end`, `destroy`) y métodos `setSkin`, `setTheme`, `setStartLevel`. Verificación: compila.
 5. Registrar `caida` en `REGISTRY`. Verificación: `/juegos/caida/jugar` arranca la partida sola con la barra mostrando puntuación y nivel reales y `—` en vidas.
-6. `components/tetris-options.tsx` con skin, tema y nivel inicial, preferencias en `av_tetris_prefs` y montaje bajo la CRT solo para `caida`; `GameCanvas` recibe las opciones iniciales y expone el motor para los cambios en vivo. Verificación: cambiar skin y tema repinta al instante, incluso en pausa; recargar conserva las preferencias.
+6. `components/tetris-options.tsx` con skin, tema y nivel inicial, preferencias en `av_tetris_prefs` y montaje en la segunda fila de `.player-hud` solo para `caida`; `GameCanvas` recibe las opciones iniciales y expone el motor para los cambios en vivo. Verificación: cambiar skin y tema repinta al instante, incluso en pausa; recargar conserva las preferencias.
 7. Comparación lado a lado con `references/started-games/03-tetris/index.html`. Verificación: mismas piezas, rotaciones, puntos por 1–4 líneas, velocidad por nivel y mismo fin de partida.
 8. Limpieza: quitar importaciones muertas y ejecutar `npm run lint` y `npm run build`. Verificación: sin errores.
 
@@ -214,7 +214,7 @@ Antes de empezar, leer en `node_modules/next/dist/docs/01-app/` las guías de Se
 - **Sí:** incluir skins, tema del canvas y nivel inicial. Decisión explícita del usuario, aunque la recomendación era dejarlos fuera por ser extras del original.
 - **Sí:** tema solo del canvas. El sitio es oscuro neón; un tema claro global toca layout y tokens y va en otro spec.
 - **Sí:** los valores de skin y tema se copian a `skins.ts`. Evita `getComputedStyle` y CSS del original dentro del motor.
-- **Sí:** panel de opciones de React bajo la CRT. Mantiene el motor sin DOM.
+- **Sí:** panel de opciones de React en la barra `.player-hud`, en una segunda fila separada por una línea fina. Mantiene el motor sin DOM. Decisión posterior del usuario: sustituye a la ubicación inicial bajo la CRT, que se veía amontonada junto a la línea de controles.
 - **Sí:** preferencias en `localStorage` (`av_tetris_prefs`), con valores por defecto si falla.
 - **Sí:** el nivel inicial no distingue marcas. Se guarda igual en `scores`; empezar alto infla la puntuación y se acepta hasta que haya antifraude.
 - **Sí:** se conservan `ArrowDown` con repetición de tecla, `Space` sin filtro de repetición y la tabla de puntos del original.
