@@ -9,16 +9,24 @@ export interface GameCanvasHandle {
   resume: () => void;
   restart: () => void;
   end: () => void;
+  engine: () => GameEngine | null; // para cambios en vivo propios de cada juego (p. ej. skin de Tetris)
 }
 
 interface GameCanvasProps {
   gameId: string;
   onStats: GameCallbacks["onStats"];
   onGameOver: GameCallbacks["onGameOver"];
+  options?: unknown; // opciones iniciales del motor; solo se leen al crearlo
   ref?: Ref<GameCanvasHandle>;
 }
 
-export function GameCanvas({ gameId, onStats, onGameOver, ref }: GameCanvasProps) {
+export function GameCanvas({
+  gameId,
+  onStats,
+  onGameOver,
+  options,
+  ref,
+}: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
   const def = REGISTRY[gameId];
@@ -27,18 +35,24 @@ export function GameCanvas({ gameId, onStats, onGameOver, ref }: GameCanvasProps
   // cambia sus funciones entre renders.
   const onStatsRef = useRef(onStats);
   const onGameOverRef = useRef(onGameOver);
+  const optionsRef = useRef(options);
   useEffect(() => {
     onStatsRef.current = onStats;
     onGameOverRef.current = onGameOver;
+    optionsRef.current = options;
   });
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !def) return;
-    const engine = def.create(canvas, {
-      onStats: (s) => onStatsRef.current(s),
-      onGameOver: (score) => onGameOverRef.current(score),
-    });
+    const engine = def.create(
+      canvas,
+      {
+        onStats: (s) => onStatsRef.current(s),
+        onGameOver: (score) => onGameOverRef.current(score),
+      },
+      optionsRef.current,
+    );
     engineRef.current = engine;
     engine.start();
     return () => {
@@ -54,6 +68,7 @@ export function GameCanvas({ gameId, onStats, onGameOver, ref }: GameCanvasProps
       resume: () => engineRef.current?.resume(),
       restart: () => engineRef.current?.restart(),
       end: () => engineRef.current?.end(),
+      engine: () => engineRef.current,
     }),
     [],
   );
