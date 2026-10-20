@@ -14,6 +14,12 @@ import {
   loadSpritesheet,
 } from "./sprites";
 
+export interface ArkanoidOptions {
+  muted: boolean;
+}
+
+const SOUND_BASE = "/games/bloque-buster/sounds/";
+
 export const W = 800;
 export const H = 600;
 
@@ -80,6 +86,10 @@ export class ArkanoidEngine implements GameEngine {
   private lastStats: GameStats | null = null;
   private gameOverEmitted = false;
 
+  private muted: boolean;
+  private readonly bounceSound: HTMLAudioElement;
+  private readonly breakSound: HTMLAudioElement;
+
   private started = false;
   private paused = false;
   private destroyed = false;
@@ -87,7 +97,11 @@ export class ArkanoidEngine implements GameEngine {
   private rafId: number | null = null;
   private lastTime: number | null = null;
 
-  constructor(canvas: HTMLCanvasElement, callbacks: GameCallbacks) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    callbacks: GameCallbacks,
+    options?: Partial<ArkanoidOptions>,
+  ) {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D no disponible");
     this.canvas = canvas;
@@ -96,6 +110,15 @@ export class ArkanoidEngine implements GameEngine {
     this.canvas.width = W;
     this.canvas.height = H;
     this.blocks = this.createBlocks();
+    this.muted = options?.muted === true;
+    this.bounceSound = new Audio(`${SOUND_BASE}ball-bounce.mp3`);
+    this.breakSound = new Audio(`${SOUND_BASE}break-sound.mp3`);
+  }
+
+  // Aplica en vivo, también en pausa o con la partida terminada.
+  setMuted(muted: boolean) {
+    this.muted = muted === true;
+    if (this.muted) this.stopSounds();
   }
 
   // ── Ciclo de vida ───────────────────────────────────────────────────────────
@@ -161,6 +184,7 @@ export class ArkanoidEngine implements GameEngine {
     this.stopLoop();
     this.removeListeners();
     this.keys.clear();
+    this.stopSounds();
   }
 
   // ── Loop ────────────────────────────────────────────────────────────────────
@@ -514,8 +538,16 @@ export class ArkanoidEngine implements GameEngine {
     this.callbacks.onGameOver(this.score);
   }
 
-  // El sonido se conecta en el paso 5.
   private playSound(kind: "bounce" | "break") {
-    void kind;
+    if (this.muted || this.destroyed) return;
+    const sound = kind === "bounce" ? this.bounceSound : this.breakSound;
+    sound.currentTime = 0;
+    // El navegador puede rechazar la reproducción (autoplay): se ignora.
+    sound.play().catch(() => {});
+  }
+
+  private stopSounds() {
+    this.bounceSound.pause();
+    this.breakSound.pause();
   }
 }
