@@ -1,31 +1,27 @@
 "use client";
 
 import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
-import {
-  AsteroidsEngine,
-  type AsteroidsStats,
-} from "@/lib/games/asteroids/engine";
+import type { GameCallbacks, GameEngine } from "@/lib/games/engine";
+import { REGISTRY } from "@/lib/games/registry";
 
-export interface AsteroidsCanvasHandle {
+export interface GameCanvasHandle {
   pause: () => void;
   resume: () => void;
   restart: () => void;
   end: () => void;
 }
 
-interface AsteroidsCanvasProps {
-  onStats: (stats: AsteroidsStats) => void;
-  onGameOver: (finalScore: number) => void;
-  ref?: Ref<AsteroidsCanvasHandle>;
+interface GameCanvasProps {
+  gameId: string;
+  onStats: GameCallbacks["onStats"];
+  onGameOver: GameCallbacks["onGameOver"];
+  ref?: Ref<GameCanvasHandle>;
 }
 
-export function AsteroidsCanvas({
-  onStats,
-  onGameOver,
-  ref,
-}: AsteroidsCanvasProps) {
+export function GameCanvas({ gameId, onStats, onGameOver, ref }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const engineRef = useRef<AsteroidsEngine | null>(null);
+  const engineRef = useRef<GameEngine | null>(null);
+  const def = REGISTRY[gameId];
 
   // Los callbacks se leen desde refs para no recrear el motor si el padre
   // cambia sus funciones entre renders.
@@ -38,8 +34,8 @@ export function AsteroidsCanvas({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const engine = new AsteroidsEngine(canvas, {
+    if (!canvas || !def) return;
+    const engine = def.create(canvas, {
       onStats: (s) => onStatsRef.current(s),
       onGameOver: (score) => onGameOverRef.current(score),
     });
@@ -49,7 +45,7 @@ export function AsteroidsCanvas({
       engine.destroy();
       engineRef.current = null;
     };
-  }, []);
+  }, [def]);
 
   useImperativeHandle(
     ref,
@@ -62,12 +58,13 @@ export function AsteroidsCanvas({
     [],
   );
 
+  if (!def) return null;
   return (
     <canvas
       ref={canvasRef}
-      className="asteroids-canvas"
-      width={800}
-      height={600}
+      className="game-canvas"
+      width={def.width}
+      height={def.height}
     />
   );
 }

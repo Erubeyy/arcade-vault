@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { AsteroidsCanvas, type AsteroidsCanvasHandle } from "@/components/asteroids-canvas";
-import type { AsteroidsStats } from "@/lib/games/asteroids/engine";
+import { GameCanvas, type GameCanvasHandle } from "@/components/game-canvas";
+import type { GameStats } from "@/lib/games/engine";
+import { REGISTRY, isRealGame } from "@/lib/games/registry";
 import { useSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/client";
 import { revalidateScores } from "@/app/juegos/[id]/jugar/actions";
@@ -15,26 +16,26 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 export function GamePlayer({ gameId, title }: { gameId: string; title: string }) {
   const { user, saveScore } = useSession();
   const [score, setScore] = useState(0);
-  const [lives, setLives] = useState(3);
+  const [lives, setLives] = useState<number | undefined>(3);
   const [paused, setPaused] = useState(false);
   const [over, setOver] = useState(false);
   const [typedName, setTypedName] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const localSaved = useRef(false); // evita duplicar la copia local en av_scores al reintentar
   const [engineLevel, setEngineLevel] = useState(1);
-  const asteroidsRef = useRef<AsteroidsCanvasHandle>(null);
-  const isAsteroids = gameId === "asteroids";
+  const canvasRef = useRef<GameCanvasHandle>(null);
+  const isReal = isRealGame(gameId);
 
   const name = typedName ?? user?.name ?? "INVITADO";
-  const level = isAsteroids ? engineLevel : 1 + Math.floor(score / 2500);
+  const level = isReal ? engineLevel : 1 + Math.floor(score / 2500);
 
   useEffect(() => {
-    if (isAsteroids || over || paused) return;
+    if (isReal || over || paused) return;
     const t = setInterval(() => setScore((s) => s + Math.floor(10 + Math.random() * 90)), 220);
     return () => clearInterval(t);
-  }, [isAsteroids, over, paused]);
+  }, [isReal, over, paused]);
 
-  const handleStats = ({ score, lives, level }: AsteroidsStats) => {
+  const handleStats = ({ score, lives, level }: GameStats) => {
     setScore(score);
     setLives(lives);
     setEngineLevel(level);
@@ -46,20 +47,20 @@ export function GamePlayer({ gameId, title }: { gameId: string; title: string })
   };
 
   const togglePause = () => {
-    if (isAsteroids) {
-      if (paused) asteroidsRef.current?.resume();
-      else asteroidsRef.current?.pause();
+    if (isReal) {
+      if (paused) canvasRef.current?.resume();
+      else canvasRef.current?.pause();
     }
     setPaused((p) => !p);
   };
 
   const finish = () => {
-    if (isAsteroids) asteroidsRef.current?.end();
+    if (isReal) canvasRef.current?.end();
     else setOver(true);
   };
 
   const restart = () => {
-    if (isAsteroids) asteroidsRef.current?.restart();
+    if (isReal) canvasRef.current?.restart();
     setScore(0);
     setLives(3);
     setEngineLevel(1);
@@ -74,7 +75,7 @@ export function GamePlayer({ gameId, title }: { gameId: string; title: string })
       saveScore({ game: gameId, score, name });
       localSaved.current = true;
     }
-    if (!isAsteroids) {
+    if (!isReal) {
       setSaveState("saved");
       return;
     }
@@ -105,7 +106,7 @@ export function GamePlayer({ gameId, title }: { gameId: string; title: string })
           </div>
           <div className="hud-stat lives">
             <div className="l">Vidas</div>
-            <div className="v">{"♥ ".repeat(lives).trim() || "—"}</div>
+            <div className="v">{lives === undefined ? "—" : "♥ ".repeat(lives).trim() || "—"}</div>
           </div>
           <div className="hud-stat level">
             <div className="l">Nivel</div>
@@ -121,9 +122,10 @@ export function GamePlayer({ gameId, title }: { gameId: string; title: string })
 
       <div className="crt">
         <div className="crt-screen">
-          {isAsteroids ? (
-            <AsteroidsCanvas
-              ref={asteroidsRef}
+          {isReal ? (
+            <GameCanvas
+              ref={canvasRef}
+              gameId={gameId}
               onStats={handleStats}
               onGameOver={handleGameOver}
             />
@@ -154,11 +156,16 @@ export function GamePlayer({ gameId, title }: { gameId: string; title: string })
         </div>
       </div>
 
-      {isAsteroids && (
+      {isReal && (
         <ul className="controls-hint" aria-label="Controles">
-          <li><kbd>←</kbd><kbd>→</kbd> rotar</li>
-          <li><kbd>↑</kbd> propulsar</li>
-          <li><kbd className="wide">ESPACIO</kbd> disparar</li>
+          {REGISTRY[gameId].controls.map(({ keys, label }) => (
+            <li key={label}>
+              {keys.map((k) => (
+                <kbd key={k} className={k.length > 2 ? "wide" : undefined}>{k}</kbd>
+              ))}{" "}
+              {label}
+            </li>
+          ))}
         </ul>
       )}
 
