@@ -1,6 +1,6 @@
 # SPEC 09 — Juego Snake jugable dentro de Arcade Vault con leaderboard
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** SPEC 05, SPEC 06, SPEC 07
 > **Fecha:** 2026-10-19
 > **Objetivo:** Crear Snake como motor de canvas desacoplado con frutas de spritesheet que aparecen al azar, registrarlo en `REGISTRY` reemplazando el placeholder `serpentina` y guardar sus marcas en el leaderboard de Supabase.
