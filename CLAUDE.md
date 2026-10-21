@@ -21,7 +21,7 @@ npm run lint    # eslint (flat config, eslint.config.mjs)
 
 - Always use `/frontend-design` to design user interfaces.
 - `/spec` and `/spec-impl` (global, in `~/.claude/skills`): write and implement specs. `specs/.spec-config.yml` sets `AutoCreateBranch: true`, so `/spec-impl` creates the `spec-NN-slug` branch without asking.
-- `game-planner` (project subagent, `.claude/agents/game-planner.md`): recommends which game to build next from the real catalog and `references/`, and remembers past suggestions (accepted/discarded) in `.claude/agent-memory/game-planner/`. Feed its pick to `/new-game`.
+- `game-planner` (project subagent, `.claude/agents/game-planner.md`): recommends which game to build next from the real catalog and `references/`, and keeps the suggestion history (pending/accepted/implemented/discarded) in `references/game-suggestions-todo.md`. Feed its pick to `/new-game`.
 - `/new-game <name or references/started-games folder>` (project skill, `.claude/skills/new-game/`): designs the spec for a new game (or a port from `references/started-games/`) with Supabase catalog entry and leaderboard. It only writes the spec; code is then produced with `/spec-impl`. Its `integration.md` documents the engine/registry architecture and the verification checklist. Manual invocation only.
 
 ## Specs implemented
