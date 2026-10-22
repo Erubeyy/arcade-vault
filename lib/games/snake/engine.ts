@@ -3,7 +3,32 @@
 
 import type { GameCallbacks, GameEngine, GameStats } from "../engine";
 
-import { FRUIT_NAMES, drawFruit, loadFruits, type FruitName } from "./sprites";
+import {
+  FRUIT_NAMES,
+  FRUIT_TINT,
+  PIXEL_FRUIT,
+  drawFruit,
+  loadFruits,
+  type FruitName,
+} from "./sprites";
+import {
+  SKIN_NAMES,
+  THEMES,
+  THEME_NAMES,
+  type SnakeSkin,
+  type SnakeTheme,
+  type ThemeTokens,
+} from "./skins";
+
+export type { SnakeSkin, SnakeTheme };
+
+// Opciones de apariencia: solo cambian el dibujo, nunca la partida.
+export interface SnakeOptions {
+  skin: SnakeSkin;
+  theme: SnakeTheme;
+}
+
+const DEFAULTS: SnakeOptions = { skin: "classic", theme: "dark" };
 
 export const W = 800;
 export const H = 600;
@@ -20,13 +45,17 @@ const FRUITS_PER_LEVEL = 5;
 const MAX_QUEUE = 2; // giros pendientes por paso
 const MAX_FRAME_MS = 100; // evita una ráfaga de pasos tras un lag
 
-const BG_COLOR = "#05080a";
-const GRID_COLOR = "rgba(0, 255, 136, 0.06)";
-const SNAKE_HEAD = "#00ff88";
-const SNAKE_BODY = "#00d673";
-const SNAKE_TAIL = "#00894c";
-const EYE_COLOR = "#05080a";
 const FRUIT_SIZE = 36; // lado mayor del sprite dentro de la celda de 40 px
+const OUTLINE_OFFSETS = [
+  [-2, 0],
+  [2, 0],
+  [0, -2],
+  [0, 2],
+  [-1.5, -1.5],
+  [1.5, -1.5],
+  [-1.5, 1.5],
+  [1.5, 1.5],
+] as const;
 
 interface Cell {
   x: number;
@@ -66,6 +95,9 @@ export class SnakeEngine implements GameEngine {
   private readonly callbacks: GameCallbacks;
 
   private img: HTMLImageElement | null = null;
+  private skin: SnakeSkin;
+  private theme: SnakeTheme;
+  private t: ThemeTokens;
 
   private state: State = "playing";
   private snake: Cell[] = []; // índice 0 = cabeza
@@ -89,7 +121,11 @@ export class SnakeEngine implements GameEngine {
   private rafId: number | null = null;
   private lastTime: number | null = null;
 
-  constructor(canvas: HTMLCanvasElement, callbacks: GameCallbacks) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    callbacks: GameCallbacks,
+    options?: Partial<SnakeOptions>,
+  ) {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D no disponible");
     this.canvas = canvas;
@@ -97,7 +133,35 @@ export class SnakeEngine implements GameEngine {
     this.callbacks = callbacks;
     this.canvas.width = W;
     this.canvas.height = H;
+    // Valores inválidos (p. ej. preferencias corruptas) caen a los de serie.
+    this.skin = SKIN_NAMES.includes(options?.skin as SnakeSkin)
+      ? (options!.skin as SnakeSkin)
+      : DEFAULTS.skin;
+    this.theme = THEME_NAMES.includes(options?.theme as SnakeTheme)
+      ? (options!.theme as SnakeTheme)
+      : DEFAULTS.theme;
+    this.t = THEMES[this.skin][this.theme];
     this.initState();
+  }
+
+  // ── Apariencia (solo dibujo; no afecta a la partida) ───────────────────────
+
+  setSkin(skin: SnakeSkin) {
+    if (!SKIN_NAMES.includes(skin)) return;
+    this.skin = skin;
+    this.applyLook();
+  }
+
+  setTheme(theme: SnakeTheme) {
+    if (!THEME_NAMES.includes(theme)) return;
+    this.theme = theme;
+    this.applyLook();
+  }
+
+  private applyLook() {
+    this.t = THEMES[this.skin][this.theme];
+    // Repinta ya, por si el bucle está detenido (pausa o fin de partida).
+    if (!this.destroyed) this.draw();
   }
 
   // ── Ciclo de vida ───────────────────────────────────────────────────────────
@@ -321,17 +385,23 @@ export class SnakeEngine implements GameEngine {
 
   // El canvas no pinta puntuación, nivel ni overlays: eso es de React.
   private draw() {
-    const { ctx } = this;
-    ctx.fillStyle = BG_COLOR;
+    const { ctx, t } = this;
+    ctx.save();
+    // Retro: sin suavizado (bordes duros); el resto escala el atlas suavizado.
+    ctx.imageSmoothingEnabled = t.pixel === 0;
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = t.background;
     ctx.fillRect(0, 0, W, H);
     this.drawGrid();
     this.drawFruitCell();
     this.drawSnake();
+    ctx.restore();
   }
 
   private drawGrid() {
-    const { ctx } = this;
-    ctx.strokeStyle = GRID_COLOR;
+    const { ctx, t } = this;
+    if (!t.grid) return;
+    ctx.strokeStyle = t.grid;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let x = 1; x < COLS; x++) {
@@ -345,59 +415,137 @@ export class SnakeEngine implements GameEngine {
     ctx.stroke();
   }
 
+  // Activa el glow del neón con el color dado (no-op si el skin no tiene glow).
+  private setGlow(color: string) {
+    const { ctx, t } = this;
+    ctx.shadowBlur = t.glow;
+    ctx.shadowColor = t.glow > 0 ? color : "transparent";
+  }
+
   private drawFruitCell() {
-    const { ctx, img, fruit } = this;
-    const cx = fruit.x * CELL + CELL / 2;
-    const cy = fruit.y * CELL + CELL / 2;
-    if (img) {
-      drawFruit(ctx, img, fruit.name, cx, cy, FRUIT_SIZE);
+    const { ctx, img, fruit, t } = this;
+    if (t.pixel > 0 && t.fruitTints) {
+      this.drawPixelFruit();
       return;
     }
-    // Sin imagen (error de carga) la fruta es un círculo de color.
-    ctx.fillStyle = "#ff006e";
+    const cx = fruit.x * CELL + CELL / 2;
+    const cy = fruit.y * CELL + CELL / 2;
+    if (img && t.fruitOutline) {
+      // Contorno plano (sombra sin desenfoque en 8 direcciones): las frutas
+      // blancas, como el nabo, desaparecerían sobre un fondo claro.
+      ctx.shadowColor = t.fruitOutline;
+      ctx.shadowBlur = 0;
+      for (const [dx, dy] of OUTLINE_OFFSETS) {
+        ctx.shadowOffsetX = dx;
+        ctx.shadowOffsetY = dy;
+        drawFruit(ctx, img, fruit.name, cx, cy, FRUIT_SIZE);
+      }
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.shadowColor = "transparent";
+    }
+    this.setGlow(t.fruitGlow);
+    if (img) {
+      drawFruit(ctx, img, fruit.name, cx, cy, FRUIT_SIZE);
+    } else {
+      // Sin imagen (error de carga) la fruta es un círculo de color.
+      ctx.fillStyle = t.fruitFallback;
+      ctx.beginPath();
+      ctx.arc(cx, cy, FRUIT_SIZE / 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  // Retro: bitmap de 8×8 «píxeles» de `t.pixel` px, con contorno opcional.
+  private drawPixelFruit() {
+    const { ctx, fruit, t } = this;
+    const p = t.pixel;
+    const tints = t.fruitTints!;
+    const ox = fruit.x * CELL + (CELL - p * 8) / 2;
+    const oy = fruit.y * CELL + (CELL - p * 8) / 2;
+    const color: Record<string, string> = {
+      L: t.fruitLeaf,
+      F: tints[FRUIT_TINT[fruit.name]],
+      H: t.fruitShine,
+    };
+    if (t.fruitOutline) {
+      // Contorno de 1 píxel: cada píxel lleno pinta antes un bloque de 3×3.
+      ctx.fillStyle = t.fruitOutline;
+      PIXEL_FRUIT.forEach((row, y) => {
+        for (let x = 0; x < row.length; x++) {
+          if (row[x] === ".") continue;
+          ctx.fillRect(ox + (x - 1) * p, oy + (y - 1) * p, p * 3, p * 3);
+        }
+      });
+    }
+    PIXEL_FRUIT.forEach((row, y) => {
+      for (let x = 0; x < row.length; x++) {
+        const c = color[row[x]];
+        if (!c) continue;
+        ctx.fillStyle = c;
+        ctx.fillRect(ox + x * p, oy + y * p, p, p);
+      }
+    });
+  }
+
+  // Rectángulo de segmento: redondeado en vectorial, de bordes duros en retro.
+  private segment(x: number, y: number, size: number, radius: number) {
+    const { ctx } = this;
     ctx.beginPath();
-    ctx.arc(cx, cy, FRUIT_SIZE / 3, 0, Math.PI * 2);
+    if (radius > 0) ctx.roundRect(x, y, size, size, radius);
+    else ctx.rect(x, y, size, size);
     ctx.fill();
   }
 
-  // Cuerpo con rectángulos redondeados (de la cola a la cabeza) y cabeza con ojos.
+  // Cuerpo de la cola a la cabeza y cabeza con ojos.
   private drawSnake() {
-    const { ctx, snake } = this;
-    const pad = 3;
+    const { ctx, snake, t } = this;
+    const retro = t.pixel > 0;
+    // En retro todo cae en múltiplos del píxel (4 px) para bordes nítidos.
+    const pad = retro ? t.pixel : 3;
     const size = CELL - pad * 2;
     for (let i = snake.length - 1; i >= 1; i--) {
-      const t = snake.length > 2 ? (i - 1) / (snake.length - 2) : 0;
-      ctx.fillStyle = t > 0.66 ? SNAKE_TAIL : SNAKE_BODY;
-      ctx.beginPath();
-      ctx.roundRect(
-        snake[i].x * CELL + pad,
-        snake[i].y * CELL + pad,
-        size,
-        size,
-        8,
-      );
-      ctx.fill();
+      const k = snake.length > 2 ? (i - 1) / (snake.length - 2) : 0;
+      const color = k > 0.66 ? t.tail : t.body;
+      const x = snake[i].x * CELL;
+      const y = snake[i].y * CELL;
+      ctx.fillStyle = color;
+      this.setGlow(color);
+      this.segment(x + pad, y + pad, size, t.radius);
+      if (t.scale) {
+        // «Escama» central de 4×4 píxeles retro.
+        const s = t.pixel * 4;
+        ctx.fillStyle = t.scale;
+        ctx.fillRect(x + (CELL - s) / 2, y + (CELL - s) / 2, s, s);
+      }
     }
 
     const head = snake[0];
-    ctx.fillStyle = SNAKE_HEAD;
-    ctx.beginPath();
-    ctx.roundRect(head.x * CELL + 1, head.y * CELL + 1, CELL - 2, CELL - 2, 12);
-    ctx.fill();
+    const hp = retro ? t.pixel : 1;
+    ctx.fillStyle = t.head;
+    this.setGlow(t.head);
+    this.segment(
+      head.x * CELL + hp,
+      head.y * CELL + hp,
+      CELL - hp * 2,
+      t.radius > 0 ? t.radius + 4 : 0,
+    );
+    ctx.shadowBlur = 0;
 
     // Ojos desplazados hacia delante y separados en perpendicular a la dirección.
-    const cx = head.x * CELL + CELL / 2 + this.dir.x * 7;
-    const cy = head.y * CELL + CELL / 2 + this.dir.y * 7;
-    ctx.fillStyle = EYE_COLOR;
+    const cx = head.x * CELL + CELL / 2 + this.dir.x * (retro ? 8 : 7);
+    const cy = head.y * CELL + CELL / 2 + this.dir.y * (retro ? 8 : 7);
+    ctx.fillStyle = t.eye;
     for (const side of [-1, 1]) {
+      const ex = cx - this.dir.y * side * 8;
+      const ey = cy + this.dir.x * side * 8;
+      if (retro) {
+        ctx.fillRect(ex - 4, ey - 4, 8, 8);
+        continue;
+      }
       ctx.beginPath();
-      ctx.arc(
-        cx - this.dir.y * side * 8,
-        cy + this.dir.x * side * 8,
-        3.5,
-        0,
-        Math.PI * 2,
-      );
+      ctx.arc(ex, ey, 3.5, 0, Math.PI * 2);
       ctx.fill();
     }
   }

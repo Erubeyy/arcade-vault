@@ -4,19 +4,26 @@
 import type { GameCallbacks, GameEngine, GameStats } from "../engine";
 
 import { LEVELS, LEVEL_CHARS, type BlockColor } from "./levels";
+import { Renderer } from "./render";
 import {
-  BALL_SPRITE,
-  BLOCK_SPRITES,
-  EXPLOSION_DURATION,
-  EXPLOSION_FRAMES,
-  PADDLE_SPRITE,
-  drawFrame,
-  loadSpritesheet,
-} from "./sprites";
+  SKIN_NAMES,
+  THEMES,
+  THEME_NAMES,
+  type ArkanoidSkin,
+  type ArkanoidTheme,
+} from "./skins";
+import { EXPLOSION_DURATION, loadSpritesheet } from "./sprites";
+
+export type { ArkanoidSkin, ArkanoidTheme };
 
 export interface ArkanoidOptions {
   muted: boolean;
+  skin: ArkanoidSkin;
+  theme: ArkanoidTheme;
 }
+
+const DEFAULT_SKIN: ArkanoidSkin = "classic";
+const DEFAULT_THEME: ArkanoidTheme = "dark";
 
 const SOUND_BASE = "/games/bloque-buster/sounds/";
 
@@ -34,7 +41,6 @@ const GRID_Y = 60; // 10 * 64 = 640 -> márgenes laterales de 80 px
 const MAX_DT = 0.05; // s, evita saltos tras un lag
 const MAX_STEP_PX = 8; // máximo recorrido de la bola por sub-paso
 const LAUNCH_SPREAD = 15; // grados desde la vertical, al azar a cada lado
-const BG_COLOR = "#000";
 
 // Teclas que el motor captura. Las flechas y Space llevan preventDefault
 // (evitan el scroll de la página); A y D no desplazan nada.
@@ -70,7 +76,9 @@ export class ArkanoidEngine implements GameEngine {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly callbacks: GameCallbacks;
 
-  private img: HTMLImageElement | null = null;
+  private readonly renderer: Renderer;
+  private skin: ArkanoidSkin;
+  private theme: ArkanoidTheme;
   private keys = new Set<string>();
 
   private state: State = "ready";
@@ -111,6 +119,13 @@ export class ArkanoidEngine implements GameEngine {
     this.canvas.height = H;
     this.blocks = this.createBlocks();
     this.muted = options?.muted === true;
+    this.skin = SKIN_NAMES.includes(options?.skin as ArkanoidSkin)
+      ? (options!.skin as ArkanoidSkin)
+      : DEFAULT_SKIN;
+    this.theme = THEME_NAMES.includes(options?.theme as ArkanoidTheme)
+      ? (options!.theme as ArkanoidTheme)
+      : DEFAULT_THEME;
+    this.renderer = new Renderer(ctx, this.skin, THEMES[this.skin][this.theme]);
     this.bounceSound = new Audio(`${SOUND_BASE}ball-bounce.mp3`);
     this.breakSound = new Audio(`${SOUND_BASE}break-sound.mp3`);
   }
@@ -121,6 +136,25 @@ export class ArkanoidEngine implements GameEngine {
     if (this.muted) this.stopSounds();
   }
 
+  // Solo cambia el dibujo; con el loop parado (pausa, fin) se repinta al momento.
+  setSkin(skin: ArkanoidSkin) {
+    if (!SKIN_NAMES.includes(skin)) return;
+    this.skin = skin;
+    this.applyLook();
+  }
+
+  setTheme(theme: ArkanoidTheme) {
+    if (!THEME_NAMES.includes(theme)) return;
+    this.theme = theme;
+    this.applyLook();
+  }
+
+  private applyLook() {
+    this.renderer.skin = this.skin;
+    this.renderer.t = THEMES[this.skin][this.theme];
+    if (this.started && !this.destroyed && this.rafId === null) this.draw();
+  }
+
   // ── Ciclo de vida ───────────────────────────────────────────────────────────
 
   start() {
@@ -128,13 +162,14 @@ export class ArkanoidEngine implements GameEngine {
     this.started = true;
     this.resetGame();
     this.addListeners();
+    // Solo el skin `arcade` usa el spritesheet: el juego no espera a que cargue.
+    this.startLoop();
     loadSpritesheet()
       .then((img) => {
         // destroy() pudo llegar mientras cargaba la imagen
         if (this.destroyed) return;
-        this.img = img;
-        if (this.paused || this.state === "gameover") this.draw();
-        else this.startLoop();
+        this.renderer.img = img;
+        if (this.rafId === null) this.draw();
       })
       .catch((err) => console.error(err));
   }
@@ -168,7 +203,7 @@ export class ArkanoidEngine implements GameEngine {
     this.keys.clear();
     this.stopLoop();
     this.resetGame();
-    if (this.img) this.startLoop();
+    this.startLoop();
   }
 
   end() {
@@ -461,50 +496,30 @@ export class ArkanoidEngine implements GameEngine {
 
   // El canvas no pinta puntuación, nivel, vidas ni overlays: eso es de React.
   private draw() {
-    const { ctx, img } = this;
-    ctx.fillStyle = BG_COLOR;
-    ctx.fillRect(0, 0, W, H);
-    if (!img) return;
+    const r = this.renderer;
+    r.clear(W, H);
 
     for (const b of this.blocks) {
-      if (b.alive) {
-        drawFrame(ctx, img, BLOCK_SPRITES[b.color], b.x, b.y, BLOCK_W, BLOCK_H);
-      }
+      if (b.alive) r.block(b.color, { x: b.x, y: b.y, w: BLOCK_W, h: BLOCK_H });
     }
 
     // Pausado, la animación se congela en la hora en que se pausó.
     const now = this.pausedAt ?? performance.now();
     for (const e of this.explosions) {
-      const frames = EXPLOSION_FRAMES[e.color];
-      const i = Math.min(
-        frames.length - 1,
-        Math.max(
-          0,
-          Math.floor(((now - e.start) / EXPLOSION_DURATION) * frames.length),
-        ),
+      const p = Math.min(
+        0.999,
+        Math.max(0, (now - e.start) / EXPLOSION_DURATION),
       );
-      drawFrame(ctx, img, frames[i], e.x, e.y, BLOCK_W, BLOCK_H);
+      r.explosion(e.color, { x: e.x, y: e.y, w: BLOCK_W, h: BLOCK_H }, p);
     }
 
     const { paddle, ball } = this;
-    drawFrame(ctx, img, PADDLE_SPRITE, paddle.x, paddle.y, paddle.w, paddle.h);
-    drawFrame(
-      ctx,
-      img,
-      BALL_SPRITE,
-      ball.x - ball.r,
-      ball.y - ball.r,
-      ball.r * 2,
-      ball.r * 2,
-    );
+    r.paddle(paddle);
+    r.ball(ball.x, ball.y, ball.r);
 
     // React no conoce el estado `ready`: la pista de lanzamiento va en el canvas.
     if (this.state === "ready") {
-      ctx.fillStyle = "#fff";
-      ctx.font = "20px monospace";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("ESPACIO PARA LANZAR", W / 2, paddle.y - 70);
+      r.text("ESPACIO PARA LANZAR", W / 2, paddle.y - 70);
     }
   }
 
