@@ -1,6 +1,6 @@
 // Registro de juegos con motor real. Los ids ausentes siguen con partida simulada.
 
-import { AsteroidsEngine } from "./asteroids/engine";
+import { AsteroidsEngine, type AsteroidsOptions } from "./asteroids/engine";
 import type { EngineFactory } from "./engine";
 import { ArkanoidEngine, type ArkanoidOptions } from "./arkanoid/engine";
 import { SnakeEngine, W as SNAKE_W, H as SNAKE_H } from "./snake/engine";
@@ -20,7 +20,12 @@ export interface GameDefinition {
 
 export const REGISTRY: Record<string, GameDefinition> = {
   asteroids: {
-    create: (canvas, cb) => new AsteroidsEngine(canvas, cb),
+    create: (canvas, cb, options) =>
+      new AsteroidsEngine(
+        canvas,
+        cb,
+        options as Partial<AsteroidsOptions> | undefined,
+      ),
     width: 800,
     height: 600,
     controls: [

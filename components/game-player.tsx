@@ -16,7 +16,17 @@ import {
 } from "@/lib/games/arkanoid/prefs";
 import { TetrisEngine, type TetrisOptions } from "@/lib/games/tetris/engine";
 import { DEFAULT_PREFS, loadPrefs, savePrefs } from "@/lib/games/tetris/prefs";
+import {
+  AsteroidsEngine,
+  type AsteroidsOptions,
+} from "@/lib/games/asteroids/engine";
+import {
+  DEFAULT_PREFS as ASTEROIDS_DEFAULT_PREFS,
+  loadPrefs as loadAsteroidsPrefs,
+  savePrefs as saveAsteroidsPrefs,
+} from "@/lib/games/asteroids/prefs";
 import { TetrisOptionsPanel } from "@/components/tetris-options";
+import { AsteroidsOptionsPanel } from "@/components/asteroids-options";
 import { ArkanoidOptionsPanel } from "@/components/arkanoid-options";
 import { useSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/client";
@@ -47,6 +57,8 @@ export function GamePlayer({
   const isReal = isRealGame(gameId);
   const isTetris = gameId === "caida";
   const isArkanoid = gameId === "bloque-buster";
+  const isAsteroids = gameId === "asteroids";
+  const hasPrefs = isTetris || isArkanoid || isAsteroids;
   // Las preferencias salen de localStorage, que el servidor no tiene: el panel y el
   // motor solo se montan tras la hidratación (`mounted`) para no desajustarla.
   const mounted = useSyncExternalStore(
@@ -60,6 +72,10 @@ export function GamePlayer({
 
   const [arkanoidPrefs, setArkanoidPrefs] = useState<ArkanoidOptions>(() =>
     isArkanoid ? loadArkanoidPrefs() : ARKANOID_DEFAULT_PREFS,
+  );
+
+  const [asteroidsPrefs, setAsteroidsPrefs] = useState<AsteroidsOptions>(() =>
+    isAsteroids ? loadAsteroidsPrefs() : ASTEROIDS_DEFAULT_PREFS,
   );
 
   const name = typedName ?? user?.name ?? "INVITADO";
@@ -90,6 +106,16 @@ export function GamePlayer({
     saveArkanoidPrefs(next);
     const engine = canvasRef.current?.engine();
     if (engine instanceof ArkanoidEngine) engine.setMuted(next.muted);
+  };
+
+  const handleAsteroidsPrefs = (next: AsteroidsOptions) => {
+    setAsteroidsPrefs(next);
+    saveAsteroidsPrefs(next);
+    const engine = canvasRef.current?.engine();
+    if (engine instanceof AsteroidsEngine) {
+      engine.setSkin(next.skin);
+      engine.setTheme(next.theme);
+    }
   };
 
   const handleStats = ({ score, lives, level }: GameStats) => {
@@ -219,12 +245,18 @@ export function GamePlayer({
             onChange={handleArkanoidPrefs}
           />
         )}
+        {isAsteroids && mounted && (
+          <AsteroidsOptionsPanel
+            value={asteroidsPrefs}
+            onChange={handleAsteroidsPrefs}
+          />
+        )}
       </div>
 
       <div className="crt">
         <div className="crt-screen">
           {isReal ? (
-            ((!isTetris && !isArkanoid) || mounted) && (
+            (!hasPrefs || mounted) && (
               <GameCanvas
                 ref={canvasRef}
                 gameId={gameId}
@@ -233,7 +265,9 @@ export function GamePlayer({
                     ? tetrisPrefs
                     : isArkanoid
                       ? arkanoidPrefs
-                      : undefined
+                      : isAsteroids
+                        ? asteroidsPrefs
+                        : undefined
                 }
                 onStats={handleStats}
                 onGameOver={handleGameOver}

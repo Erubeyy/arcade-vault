@@ -1,0 +1,1 @@
+- [Cumplimiento de skins por juego](project_skin_compliance.md) — asteroids cumple (2026-10-21); Tetris pendiente de migrar a classic; paletas elegidas

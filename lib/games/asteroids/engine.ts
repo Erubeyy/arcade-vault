@@ -15,6 +15,23 @@ import {
   type Keys,
 } from "./entities";
 import type { GameCallbacks, GameEngine, GameStats } from "../engine";
+import { Pen } from "./pen";
+import {
+  SKIN_NAMES,
+  THEME_NAMES,
+  THEMES,
+  type AsteroidsSkin,
+  type AsteroidsTheme,
+} from "./skins";
+
+export type { AsteroidsSkin, AsteroidsTheme };
+
+export interface AsteroidsOptions {
+  skin: AsteroidsSkin;
+  theme: AsteroidsTheme;
+}
+
+const DEFAULTS: AsteroidsOptions = { skin: "classic", theme: "dark" };
 
 type State = "playing" | "dead" | "gameover";
 
@@ -24,8 +41,10 @@ const SHIELD_DURATION = 5; // segundos de escudo temporal
 const GAME_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "Space"]);
 
 export class AsteroidsEngine implements GameEngine {
-  private readonly ctx: CanvasRenderingContext2D;
+  private readonly pen: Pen;
   private readonly callbacks: GameCallbacks;
+  private skin: AsteroidsSkin;
+  private theme: AsteroidsTheme;
 
   private keys: Keys = {};
   private justPressed: Keys = {};
@@ -52,11 +71,42 @@ export class AsteroidsEngine implements GameEngine {
   private destroyed = false;
   private lastStats: GameStats | null = null;
 
-  constructor(canvas: HTMLCanvasElement, callbacks: GameCallbacks) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    callbacks: GameCallbacks,
+    options?: Partial<AsteroidsOptions>,
+  ) {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D no disponible");
-    this.ctx = ctx;
     this.callbacks = callbacks;
+    // Opciones inválidas o ausentes caen en los valores por defecto.
+    this.skin = SKIN_NAMES.includes(options?.skin as AsteroidsSkin)
+      ? (options!.skin as AsteroidsSkin)
+      : DEFAULTS.skin;
+    this.theme = THEME_NAMES.includes(options?.theme as AsteroidsTheme)
+      ? (options!.theme as AsteroidsTheme)
+      : DEFAULTS.theme;
+    this.pen = new Pen(ctx, THEMES[this.skin][this.theme]);
+  }
+
+  // ── Apariencia (solo dibujo; no afecta a la partida) ───────────────────────
+
+  setSkin(skin: AsteroidsSkin) {
+    if (!SKIN_NAMES.includes(skin)) return;
+    this.skin = skin;
+    this.applyLook();
+  }
+
+  setTheme(theme: AsteroidsTheme) {
+    if (!THEME_NAMES.includes(theme)) return;
+    this.theme = theme;
+    this.applyLook();
+  }
+
+  private applyLook() {
+    this.pen.t = THEMES[this.skin][this.theme];
+    // Repinta ya, por si el bucle está detenido (pausa).
+    if (!this.destroyed) this.draw();
   }
 
   // ── Ciclo de vida ───────────────────────────────────────────────────────────
@@ -355,31 +405,26 @@ export class AsteroidsEngine implements GameEngine {
   // El HUD de puntuación, vidas, nivel y GAME OVER vive en React. Aquí solo
   // quedan los contadores de power-ups.
   private drawPowerUpTimers() {
-    const { ctx } = this;
-    ctx.font = "13px monospace";
-    ctx.textAlign = "left";
+    const { pen } = this;
     let y = 26;
     if (this.tripleTimer > 0) {
-      ctx.fillStyle = "#0ff";
-      ctx.fillText(`TRIPLE ${Math.ceil(this.tripleTimer)}s`, 14, y);
+      pen.text(`TRIPLE ${Math.ceil(this.tripleTimer)}s`, 14, y, pen.t.triple);
       y += 18;
     }
     if (this.shieldTimer > 0) {
-      ctx.fillStyle = "#0f6";
-      ctx.fillText(`ESCUDO ${Math.ceil(this.shieldTimer)}s`, 14, y);
+      pen.text(`ESCUDO ${Math.ceil(this.shieldTimer)}s`, 14, y, pen.t.shield);
     }
   }
 
   private draw() {
-    const { ctx } = this;
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, W, H);
+    const { pen } = this;
+    pen.clear(W, H);
 
-    this.particles.forEach((p) => p.draw(ctx));
-    this.asteroids.forEach((a) => a.draw(ctx));
-    this.powerUps.forEach((p) => p.draw(ctx));
-    this.bullets.forEach((b) => b.draw(ctx));
-    this.ship.draw(ctx, this.shieldTimer > 0);
+    this.particles.forEach((p) => p.draw(pen));
+    this.asteroids.forEach((a) => a.draw(pen));
+    this.powerUps.forEach((p) => p.draw(pen));
+    this.bullets.forEach((b) => b.draw(pen));
+    this.ship.draw(pen, this.shieldTimer > 0);
 
     this.drawPowerUpTimers();
   }
