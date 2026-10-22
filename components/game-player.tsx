@@ -16,8 +16,25 @@ import {
 } from "@/lib/games/arkanoid/prefs";
 import { TetrisEngine, type TetrisOptions } from "@/lib/games/tetris/engine";
 import { DEFAULT_PREFS, loadPrefs, savePrefs } from "@/lib/games/tetris/prefs";
+import {
+  AsteroidsEngine,
+  type AsteroidsOptions,
+} from "@/lib/games/asteroids/engine";
+import {
+  DEFAULT_PREFS as ASTEROIDS_DEFAULT_PREFS,
+  loadPrefs as loadAsteroidsPrefs,
+  savePrefs as saveAsteroidsPrefs,
+} from "@/lib/games/asteroids/prefs";
+import { SnakeEngine, type SnakeOptions } from "@/lib/games/snake/engine";
+import {
+  DEFAULT_PREFS as SNAKE_DEFAULT_PREFS,
+  loadPrefs as loadSnakePrefs,
+  savePrefs as saveSnakePrefs,
+} from "@/lib/games/snake/prefs";
 import { TetrisOptionsPanel } from "@/components/tetris-options";
+import { AsteroidsOptionsPanel } from "@/components/asteroids-options";
 import { ArkanoidOptionsPanel } from "@/components/arkanoid-options";
+import { SnakeOptionsPanel } from "@/components/snake-options";
 import { useSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/client";
 import { revalidateScores } from "@/app/juegos/[id]/jugar/actions";
@@ -47,6 +64,9 @@ export function GamePlayer({
   const isReal = isRealGame(gameId);
   const isTetris = gameId === "caida";
   const isArkanoid = gameId === "bloque-buster";
+  const isAsteroids = gameId === "asteroids";
+  const isSnake = gameId === "serpentina";
+  const hasPrefs = isTetris || isArkanoid || isAsteroids || isSnake;
   // Las preferencias salen de localStorage, que el servidor no tiene: el panel y el
   // motor solo se montan tras la hidratación (`mounted`) para no desajustarla.
   const mounted = useSyncExternalStore(
@@ -60,6 +80,14 @@ export function GamePlayer({
 
   const [arkanoidPrefs, setArkanoidPrefs] = useState<ArkanoidOptions>(() =>
     isArkanoid ? loadArkanoidPrefs() : ARKANOID_DEFAULT_PREFS,
+  );
+
+  const [asteroidsPrefs, setAsteroidsPrefs] = useState<AsteroidsOptions>(() =>
+    isAsteroids ? loadAsteroidsPrefs() : ASTEROIDS_DEFAULT_PREFS,
+  );
+
+  const [snakePrefs, setSnakePrefs] = useState<SnakeOptions>(() =>
+    isSnake ? loadSnakePrefs() : SNAKE_DEFAULT_PREFS,
   );
 
   const name = typedName ?? user?.name ?? "INVITADO";
@@ -89,7 +117,31 @@ export function GamePlayer({
     setArkanoidPrefs(next);
     saveArkanoidPrefs(next);
     const engine = canvasRef.current?.engine();
-    if (engine instanceof ArkanoidEngine) engine.setMuted(next.muted);
+    if (engine instanceof ArkanoidEngine) {
+      engine.setMuted(next.muted);
+      engine.setSkin(next.skin);
+      engine.setTheme(next.theme);
+    }
+  };
+
+  const handleAsteroidsPrefs = (next: AsteroidsOptions) => {
+    setAsteroidsPrefs(next);
+    saveAsteroidsPrefs(next);
+    const engine = canvasRef.current?.engine();
+    if (engine instanceof AsteroidsEngine) {
+      engine.setSkin(next.skin);
+      engine.setTheme(next.theme);
+    }
+  };
+
+  const handleSnakePrefs = (next: SnakeOptions) => {
+    setSnakePrefs(next);
+    saveSnakePrefs(next);
+    const engine = canvasRef.current?.engine();
+    if (engine instanceof SnakeEngine) {
+      engine.setSkin(next.skin);
+      engine.setTheme(next.theme);
+    }
   };
 
   const handleStats = ({ score, lives, level }: GameStats) => {
@@ -219,12 +271,21 @@ export function GamePlayer({
             onChange={handleArkanoidPrefs}
           />
         )}
+        {isAsteroids && mounted && (
+          <AsteroidsOptionsPanel
+            value={asteroidsPrefs}
+            onChange={handleAsteroidsPrefs}
+          />
+        )}
+        {isSnake && mounted && (
+          <SnakeOptionsPanel value={snakePrefs} onChange={handleSnakePrefs} />
+        )}
       </div>
 
       <div className="crt">
         <div className="crt-screen">
           {isReal ? (
-            ((!isTetris && !isArkanoid) || mounted) && (
+            (!hasPrefs || mounted) && (
               <GameCanvas
                 ref={canvasRef}
                 gameId={gameId}
@@ -233,7 +294,11 @@ export function GamePlayer({
                     ? tetrisPrefs
                     : isArkanoid
                       ? arkanoidPrefs
-                      : undefined
+                      : isAsteroids
+                        ? asteroidsPrefs
+                        : isSnake
+                          ? snakePrefs
+                          : undefined
                 }
                 onStats={handleStats}
                 onGameOver={handleGameOver}

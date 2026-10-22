@@ -21,7 +21,9 @@ npm run lint    # eslint (flat config, eslint.config.mjs)
 
 - Always use `/frontend-design` to design user interfaces.
 - `/spec` and `/spec-impl` (global, in `~/.claude/skills`): write and implement specs. `specs/.spec-config.yml` sets `AutoCreateBranch: true`, so `/spec-impl` creates the `spec-NN-slug` branch without asking.
+- `game-planner` (project subagent, `.claude/agents/game-planner.md`): recommends which game to build next from the real catalog and `references/`, and keeps the suggestion history (pending/accepted/implemented/discarded) in `references/game-suggestions-todo.md`. Feed its pick to `/new-game`.
 - `/new-game <name or references/started-games folder>` (project skill, `.claude/skills/new-game/`): designs the spec for a new game (or a port from `references/started-games/`) with Supabase catalog entry and leaderboard. It only writes the spec; code is then produced with `/spec-impl`. Its `integration.md` documents the engine/registry architecture and the verification checklist. Manual invocation only.
+- `game-jam` (project subagent, `.claude/agents/game-jam.md`): give it a game or an idea and it writes at least 2 full spec variants of that game, one file each, to `specs/game-jam/<game-id>-vN.md` (status `Borrador`, no `NN`, same format as specs 07-09) so you can pick one. It writes only there. To implement a variant: move it to `specs/NN-juego-<slug>.md`, drop "JAM" from the title, set `Aprobado` and run `/spec-impl`.
 
 ## Specs implemented
 

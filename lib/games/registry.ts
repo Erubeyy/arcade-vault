@@ -1,9 +1,14 @@
 // Registro de juegos con motor real. Los ids ausentes siguen con partida simulada.
 
-import { AsteroidsEngine } from "./asteroids/engine";
+import { AsteroidsEngine, type AsteroidsOptions } from "./asteroids/engine";
 import type { EngineFactory } from "./engine";
 import { ArkanoidEngine, type ArkanoidOptions } from "./arkanoid/engine";
-import { SnakeEngine, W as SNAKE_W, H as SNAKE_H } from "./snake/engine";
+import {
+  SnakeEngine,
+  W as SNAKE_W,
+  H as SNAKE_H,
+  type SnakeOptions,
+} from "./snake/engine";
 import {
   TetrisEngine,
   W as TETRIS_W,
@@ -20,7 +25,12 @@ export interface GameDefinition {
 
 export const REGISTRY: Record<string, GameDefinition> = {
   asteroids: {
-    create: (canvas, cb) => new AsteroidsEngine(canvas, cb),
+    create: (canvas, cb, options) =>
+      new AsteroidsEngine(
+        canvas,
+        cb,
+        options as Partial<AsteroidsOptions> | undefined,
+      ),
     width: 800,
     height: 600,
     controls: [
@@ -64,7 +74,8 @@ export const REGISTRY: Record<string, GameDefinition> = {
   },
   // Snake reemplaza al placeholder `serpentina` del catálogo (SPEC 09): el id no cambia.
   serpentina: {
-    create: (canvas, cb) => new SnakeEngine(canvas, cb),
+    create: (canvas, cb, options) =>
+      new SnakeEngine(canvas, cb, options as Partial<SnakeOptions> | undefined),
     width: SNAKE_W,
     height: SNAKE_H,
     controls: [

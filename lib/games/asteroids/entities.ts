@@ -1,6 +1,8 @@
 // Entidades de Asteroids portadas de references/started-games/02-asteroids/game.js.
 // Sin dependencia de document ni window: el contexto 2D y el estado de teclas
-// llegan como argumentos.
+// llegan como argumentos. El dibujo pasa por `Pen`, que aplica el skin activo.
+
+import type { Pen, Point } from "./pen";
 
 export const W = 800;
 export const H = 600;
@@ -44,9 +46,12 @@ export const LARGE_ASTEROID_SHAPES: Vertex[][] = [
 ];
 
 export type PowerUpKind = "triple" | "shield";
-const POWERUP_COLORS: Record<PowerUpKind, string> = {
-  triple: "#0ff",
-  shield: "#0f6",
+
+// Rota y traslada puntos locales a coordenadas de mundo.
+const place = (pts: Point[], x: number, y: number, a: number): Point[] => {
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return pts.map(([px, py]) => [x + px * c - py * s, y + px * s + py * c]);
 };
 
 // ── Bullet ────────────────────────────────────────────────────────────────────
@@ -75,11 +80,8 @@ export class Bullet {
     if (this.ttl <= 0) this.dead = true;
   }
 
-  draw(ctx: CanvasRenderingContext2D) {
-    ctx.fillStyle = "#fff";
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fill();
+  draw(pen: Pen) {
+    pen.dot(this.x, this.y, this.radius, pen.t.bullet);
   }
 }
 
@@ -144,20 +146,8 @@ export class Asteroid {
     ];
   }
 
-  draw(ctx: CanvasRenderingContext2D) {
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.rot);
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = "round";
-    ctx.beginPath();
-    ctx.moveTo(this.verts[0][0], this.verts[0][1]);
-    for (let i = 1; i < this.verts.length; i++)
-      ctx.lineTo(this.verts[i][0], this.verts[i][1]);
-    ctx.closePath();
-    ctx.stroke();
-    ctx.restore();
+  draw(pen: Pen) {
+    pen.poly(place(this.verts, this.x, this.y, this.rot), pen.t.asteroid);
   }
 }
 
@@ -233,50 +223,33 @@ export class Ship {
     return [new Bullet(ox, oy, this.angle)];
   }
 
-  draw(ctx: CanvasRenderingContext2D, shieldActive: boolean) {
+  draw(pen: Pen, shieldActive: boolean) {
     if (this.dead) return;
     // Parpadeo durante invencibilidad de reaparición
     if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0)
       return;
 
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.angle);
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = "round";
-
-    // Silueta clásica: triángulo con muesca trasera
-    ctx.beginPath();
-    ctx.moveTo(20, 0); // nariz
-    ctx.lineTo(-12, -9); // ala izquierda
-    ctx.lineTo(-7, 0); // muesca trasera
-    ctx.lineTo(-12, 9); // ala derecha
-    ctx.closePath();
-    ctx.stroke();
+    // Silueta clásica: nariz, ala izquierda, muesca trasera, ala derecha
+    const hull: Point[] = [
+      [20, 0],
+      [-12, -9],
+      [-7, 0],
+      [-12, 9],
+    ];
+    pen.poly(place(hull, this.x, this.y, this.angle), pen.t.ship);
 
     // Llama del propulsor
     if (this.thrusting && Math.random() > 0.35) {
-      ctx.beginPath();
-      ctx.moveTo(-8, -4);
-      ctx.lineTo(-8 - rand(6, 14), 0);
-      ctx.lineTo(-8, 4);
-      ctx.strokeStyle = "rgba(255, 130, 0, 0.85)";
-      ctx.stroke();
+      const flame: Point[] = [
+        [-8, -4],
+        [-8 - rand(6, 14), 0],
+        [-8, 4],
+      ];
+      pen.poly(place(flame, this.x, this.y, this.angle), pen.t.thrust, false);
     }
-
-    ctx.restore();
 
     // Anillo del escudo (no rota con la nave)
-    if (shieldActive) {
-      ctx.save();
-      ctx.strokeStyle = "rgba(0, 255, 120, 0.85)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius + 6, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
+    if (shieldActive) pen.ring(this.x, this.y, this.radius + 6, pen.t.shield);
   }
 }
 
@@ -309,14 +282,18 @@ export class Particle {
     if (this.ttl <= 0) this.dead = true;
   }
 
-  draw(ctx: CanvasRenderingContext2D) {
+  draw(pen: Pen) {
     const alpha = this.ttl / this.life;
-    ctx.strokeStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(this.x, this.y);
-    ctx.lineTo(this.x - this.vx * 0.05, this.y - this.vy * 0.05);
-    ctx.stroke();
+    // En retro no hay transparencias: la chispa se ve entera y se apaga antes.
+    if (pen.t.pixel > 0 && alpha < 0.3) return;
+    pen.line(
+      this.x,
+      this.y,
+      this.x - this.vx * 0.05,
+      this.y - this.vy * 0.05,
+      pen.t.particle,
+      alpha,
+    );
   }
 }
 
@@ -351,41 +328,36 @@ export class PowerUp {
     if (this.ttl <= 0) this.dead = true;
   }
 
-  draw(ctx: CanvasRenderingContext2D) {
+  draw(pen: Pen) {
     // Parpadeo cuando quedan menos de 2 s
     if (this.ttl < 2 && Math.floor(this.ttl * 8) % 2 === 0) return;
 
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.strokeStyle = POWERUP_COLORS[this.kind];
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-    ctx.stroke();
+    const { x, y, radius: r } = this;
+    const color = this.kind === "triple" ? pen.t.triple : pen.t.shield;
+    pen.ring(x, y, r, color);
 
     if (this.kind === "triple") {
       // Tres rayitas en abanico
       for (const a of [-0.3, 0, 0.3]) {
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(
-          Math.cos(a) * this.radius * 0.7,
-          Math.sin(a) * this.radius * 0.7 - this.radius * 0.3,
+        pen.line(
+          x,
+          y,
+          x + Math.cos(a) * r * 0.7,
+          y + Math.sin(a) * r * 0.7 - r * 0.3,
+          color,
         );
-        ctx.stroke();
       }
     } else {
       // Ícono de escudo
-      ctx.beginPath();
-      ctx.moveTo(0, -this.radius * 0.6);
-      ctx.lineTo(this.radius * 0.5, -this.radius * 0.25);
-      ctx.lineTo(this.radius * 0.5, this.radius * 0.2);
-      ctx.lineTo(0, this.radius * 0.6);
-      ctx.lineTo(-this.radius * 0.5, this.radius * 0.2);
-      ctx.lineTo(-this.radius * 0.5, -this.radius * 0.25);
-      ctx.closePath();
-      ctx.stroke();
+      const icon: Point[] = [
+        [0, -r * 0.6],
+        [r * 0.5, -r * 0.25],
+        [r * 0.5, r * 0.2],
+        [0, r * 0.6],
+        [-r * 0.5, r * 0.2],
+        [-r * 0.5, -r * 0.25],
+      ];
+      pen.poly(place(icon, x, y, 0), color);
     }
-    ctx.restore();
   }
 }
