@@ -62,7 +62,14 @@ export const REGISTRY: Record<string, GameDefinition> = {
       { keys: ["↓"], label: "bajar" },
       { keys: ["ESPACIO"], label: "caída" },
     ],
-    pad: {},
+    pad: {
+      left: "Mover a la izquierda",
+      right: "Mover a la derecha",
+      up: "Rotar",
+      down: "Bajar",
+      a: "Rotar",
+      b: "Caída",
+    },
   },
   // Arkanoid reemplaza al placeholder `bloque-buster` del catálogo (SPEC 08): el id no cambia.
   "bloque-buster": {
