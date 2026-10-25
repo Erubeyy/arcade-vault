@@ -39,7 +39,12 @@ export const REGISTRY: Record<string, GameDefinition> = {
       { keys: ["↑"], label: "propulsar" },
       { keys: ["ESPACIO"], label: "disparar" },
     ],
-    pad: {},
+    pad: {
+      left: "Rotar a la izquierda",
+      right: "Rotar a la derecha",
+      up: "Propulsar",
+      a: "Disparar",
+    },
   },
   // Tetris reemplaza al placeholder `caida` del catálogo (SPEC 07): el id no cambia.
   caida: {
