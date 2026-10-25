@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
-import type { GameCallbacks, GameEngine } from "@/lib/games/engine";
+import type {
+  GameCallbacks,
+  GameEngine,
+  VirtualButton,
+} from "@/lib/games/engine";
 import { REGISTRY } from "@/lib/games/registry";
 
 export interface GameCanvasHandle {
@@ -9,6 +13,7 @@ export interface GameCanvasHandle {
   resume: () => void;
   restart: () => void;
   end: () => void;
+  input: (button: VirtualButton, pressed: boolean) => void; // gamepad virtual (SPEC 10)
   engine: () => GameEngine | null; // para cambios en vivo propios de cada juego (p. ej. skin de Tetris)
 }
 
@@ -68,6 +73,8 @@ export function GameCanvas({
       resume: () => engineRef.current?.resume(),
       restart: () => engineRef.current?.restart(),
       end: () => engineRef.current?.end(),
+      input: (button, pressed) =>
+        engineRef.current?.setInput?.(button, pressed),
       engine: () => engineRef.current,
     }),
     [],

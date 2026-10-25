@@ -11,6 +11,9 @@ export interface GameCallbacks {
   onGameOver: (finalScore: number) => void; // una vez por partida
 }
 
+// Botones del gamepad virtual táctil (SPEC 10): cruceta + A y B.
+export type VirtualButton = "up" | "down" | "left" | "right" | "a" | "b";
+
 export interface GameEngine {
   start(): void;
   pause(): void;
@@ -18,6 +21,8 @@ export interface GameEngine {
   restart(): void; // reinicia desde cero y emite onStats
   end(): void; // termina la partida y emite onGameOver (botón FIN)
   destroy(): void; // cancela rAF, quita listeners; idempotente
+  setInput?(button: VirtualButton, pressed: boolean): void; // entrada virtual; true = pulsado, false = soltado
+  releaseInput?(): void; // suelta todos los botones virtuales
 }
 
 export type EngineFactory = (
