@@ -1,7 +1,12 @@
 // Motor de Snake (SPEC 09). No tiene juego de referencia: las constantes se definen en el spec.
 // Recibe un <canvas> y avisa a React por callbacks; no conoce React ni el DOM global.
 
-import type { GameCallbacks, GameEngine, GameStats } from "../engine";
+import type {
+  GameCallbacks,
+  GameEngine,
+  GameStats,
+  VirtualButton,
+} from "../engine";
 
 import {
   FRUIT_NAMES,
@@ -80,6 +85,12 @@ const ARROW_KEYS: Record<string, Cell> = {
   ArrowDown: DOWN,
   ArrowLeft: LEFT,
   ArrowRight: RIGHT,
+};
+const PAD_DIRS: Partial<Record<VirtualButton, Cell>> = {
+  up: UP,
+  down: DOWN,
+  left: LEFT,
+  right: RIGHT,
 };
 const TURN_KEYS: Record<string, Cell> = {
   ...ARROW_KEYS,
@@ -225,6 +236,17 @@ export class SnakeEngine implements GameEngine {
     this.removeListeners();
     this.queue = [];
   }
+
+  // Entrada del gamepad virtual (SPEC 10): cada pulsación encola un giro, igual que una flecha.
+  setInput(button: VirtualButton, pressed: boolean) {
+    if (!pressed || this.destroyed || this.paused || this.state === "gameover")
+      return;
+    const dir = PAD_DIRS[button];
+    if (dir) this.queueTurn(dir);
+  }
+
+  // Los giros son puntuales y no hay botones «mantenidos» que soltar.
+  releaseInput() {}
 
   // ── Loop ────────────────────────────────────────────────────────────────────
 

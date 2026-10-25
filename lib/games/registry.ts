@@ -86,7 +86,12 @@ export const REGISTRY: Record<string, GameDefinition> = {
       { keys: ["←", "↑", "→", "↓"], label: "mover" },
       { keys: ["W", "A", "S", "D"], label: "mover" },
     ],
-    pad: {},
+    pad: {
+      up: "Arriba",
+      down: "Abajo",
+      left: "Izquierda",
+      right: "Derecha",
+    },
   },
 };
 
