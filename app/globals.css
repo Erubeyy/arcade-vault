@@ -1159,6 +1159,164 @@ a {
   letter-spacing: 0.12em;
 }
 
+/* touch pad (SPEC 10): d-pad + A/B under the CRT, only on coarse pointers */
+.touch-pad {
+  display: none;
+}
+.tp-dpad {
+  --tp-cell: 60px;
+  display: grid;
+  grid-template: repeat(3, var(--tp-cell)) / repeat(3, var(--tp-cell));
+}
+.tp-arm,
+.tp-act {
+  padding: 0;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background 60ms,
+    box-shadow 60ms,
+    transform 60ms;
+}
+.tp-arm {
+  display: grid;
+  place-items: center;
+  color: var(--cyan);
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+}
+.tp-up {
+  grid-area: 1 / 2;
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+}
+.tp-left {
+  grid-area: 2 / 1;
+  border-right: 0;
+  border-radius: 14px 0 0 14px;
+}
+.tp-right {
+  grid-area: 2 / 3;
+  border-left: 0;
+  border-radius: 0 14px 14px 0;
+}
+.tp-down {
+  grid-area: 3 / 2;
+  border-top: 0;
+  border-radius: 0 0 14px 14px;
+}
+.tp-hub {
+  grid-area: 2 / 2;
+  background: var(--bg-3);
+}
+.tp-arm[data-down] {
+  background: rgba(0, 245, 255, 0.22);
+  box-shadow:
+    0 0 14px rgba(0, 245, 255, 0.5),
+    inset 0 0 10px rgba(0, 245, 255, 0.3);
+}
+.tp-actions {
+  position: relative;
+  flex: none;
+  width: 156px;
+  height: 132px;
+}
+.tp-act {
+  position: absolute;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: #050507;
+  border: 2px solid currentColor;
+  font-family: var(--pixel);
+  font-size: 16px;
+}
+.tp-a {
+  top: 0;
+  right: 0;
+  color: var(--magenta);
+}
+.tp-b {
+  bottom: 0;
+  left: 0;
+  color: var(--yellow);
+}
+.tp-act[data-down] {
+  transform: translateY(2px);
+  background: color-mix(in srgb, currentColor 30%, #050507);
+  box-shadow:
+    0 0 16px color-mix(in srgb, currentColor 60%, transparent),
+    inset 0 0 10px color-mix(in srgb, currentColor 35%, transparent);
+}
+.tp-arm:disabled,
+.tp-act:disabled {
+  opacity: 0.22;
+  box-shadow: none;
+  cursor: default;
+}
+
+@media (pointer: coarse) {
+  .touch-pad {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 20px;
+    padding: 0 4px;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+  /* sin teclado la línea de teclas no sirve, y la barra de la CRT es decorativa */
+  .av-player.has-pad .controls-hint,
+  .av-player.has-pad .crt-bottom {
+    display: none;
+  }
+}
+
+/* landscape: d-pad left of the CRT, A/B right of it, so the canvas keeps a playable size */
+@media (pointer: coarse) and (orientation: landscape) {
+  .av-player.has-pad {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "hud hud hud"
+      "dpad crt acts";
+    align-items: center;
+    column-gap: 14px;
+    margin: 8px auto;
+    padding: 0 12px 12px;
+  }
+  .av-player.has-pad .player-hud {
+    grid-area: hud;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+  }
+  .av-player.has-pad .crt {
+    grid-area: crt;
+    padding: 10px;
+    border-radius: 18px;
+  }
+  .av-player.has-pad .crt-screen {
+    width: min(100%, calc((100dvh - 120px) * 4 / 3));
+    margin-inline: auto;
+  }
+  .av-player.has-pad .touch-pad {
+    display: contents;
+  }
+  .av-player.has-pad .tp-dpad {
+    grid-area: dpad;
+    --tp-cell: 56px;
+  }
+  .av-player.has-pad .tp-actions {
+    grid-area: acts;
+  }
+}
+
 /* tetris options: second row of the player HUD */
 .hud-options {
   display: flex;

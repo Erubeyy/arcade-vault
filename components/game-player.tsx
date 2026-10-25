@@ -35,6 +35,7 @@ import { TetrisOptionsPanel } from "@/components/tetris-options";
 import { AsteroidsOptionsPanel } from "@/components/asteroids-options";
 import { ArkanoidOptionsPanel } from "@/components/arkanoid-options";
 import { SnakeOptionsPanel } from "@/components/snake-options";
+import { TouchPad } from "@/components/touch-pad";
 import { useSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/client";
 import { revalidateScores } from "@/app/juegos/[id]/jugar/actions";
@@ -224,7 +225,7 @@ export function GamePlayer({
   };
 
   return (
-    <div className="av-player fade-in">
+    <div className={`av-player fade-in${isReal ? " has-pad" : ""}`}>
       <div className="player-hud">
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
           <div className="hud-stat">
@@ -343,6 +344,16 @@ export function GamePlayer({
           <span>CARGA · 1MB</span>
         </div>
       </div>
+
+      {isReal && (
+        <TouchPad
+          pad={REGISTRY[gameId].pad}
+          disabled={paused || over}
+          onInput={(button, pressed) =>
+            canvasRef.current?.input(button, pressed)
+          }
+        />
+      )}
 
       {isReal && (
         <ul className="controls-hint" aria-label="Controles">
