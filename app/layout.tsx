@@ -1,5 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Courier_Prime, JetBrains_Mono, Press_Start_2P } from "next/font/google";
+import {
+  Courier_Prime,
+  JetBrains_Mono,
+  Press_Start_2P,
+} from "next/font/google";
 import { Nav } from "@/components/nav";
 import { SessionProvider } from "@/lib/session";
 import "./globals.css";
@@ -38,6 +42,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${pressStart.variable} ${jetbrainsMono.variable} ${courierPrime.variable}`}
     >
       <body>
