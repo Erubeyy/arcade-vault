@@ -25,6 +25,8 @@ npm run lint    # eslint (flat config, eslint.config.mjs)
 - `/new-game <name or references/started-games folder>` (project skill, `.claude/skills/new-game/`): designs the spec for a new game (or a port from `references/started-games/`) with Supabase catalog entry and leaderboard. It only writes the spec; code is then produced with `/spec-impl`. Its `integration.md` documents the engine/registry architecture and the verification checklist. Manual invocation only.
 - `game-jam` (project subagent, `.claude/agents/game-jam.md`): give it a game or an idea and it writes at least 2 full spec variants of that game, one file each, to `specs/game-jam/<game-id>-vN.md` (status `Borrador`, no `NN`, same format as specs 07-09) so you can pick one. It writes only there. To implement a variant: move it to `specs/NN-juego-<slug>.md`, drop "JAM" from the title, set `Aprobado` and run `/spec-impl`.
 
+- `mobile-porter` (project subagent, `.claude/agents/mobile-porter.md`): `mobile-porter: <route or game>` audits and fixes ONE route or real game for mobile browsers (portrait and landscape, desktop untouched), using spec 10 as reference, verifies with Playwright at 375×667, 390×844, 844×390 and 1280×800, and records the result in `references/mobile-ready.md`. Browser only (no PWA/native).
+
 ## Specs implemented
 
 | Spec   | Content                                                                       |

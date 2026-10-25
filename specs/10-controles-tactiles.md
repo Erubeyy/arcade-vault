@@ -1,6 +1,6 @@
 # SPEC 10 — Controles táctiles para jugar en móvil
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** SPEC 05, SPEC 06, SPEC 07, SPEC 08, SPEC 09
 > **Fecha:** 2026-10-25
 > **Objetivo:** Añadir un gamepad virtual único (cruceta + botones A y B) bajo el canvas, que mueve cualquiera de los 4 juegos reales desde una pantalla táctil mediante una entrada virtual en el contrato `GameEngine`.
