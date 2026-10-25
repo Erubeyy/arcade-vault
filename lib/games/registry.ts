@@ -74,7 +74,11 @@ export const REGISTRY: Record<string, GameDefinition> = {
       { keys: ["A", "D"], label: "mover" },
       { keys: ["ESPACIO"], label: "lanzar" },
     ],
-    pad: {},
+    pad: {
+      left: "Mover a la izquierda",
+      right: "Mover a la derecha",
+      a: "Lanzar la bola",
+    },
   },
   // Snake reemplaza al placeholder `serpentina` del catálogo (SPEC 09): el id no cambia.
   serpentina: {
