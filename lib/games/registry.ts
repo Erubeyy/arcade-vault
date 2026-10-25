@@ -1,7 +1,7 @@
 // Registro de juegos con motor real. Los ids ausentes siguen con partida simulada.
 
 import { AsteroidsEngine, type AsteroidsOptions } from "./asteroids/engine";
-import type { EngineFactory } from "./engine";
+import type { EngineFactory, VirtualButton } from "./engine";
 import { ArkanoidEngine, type ArkanoidOptions } from "./arkanoid/engine";
 import {
   SnakeEngine,
@@ -21,6 +21,7 @@ export interface GameDefinition {
   width: number;
   height: number;
   controls: { keys: string[]; label: string }[];
+  pad: Partial<Record<VirtualButton, string>>; // botón usado → etiqueta accesible; los ausentes se desactivan
 }
 
 export const REGISTRY: Record<string, GameDefinition> = {
@@ -38,6 +39,12 @@ export const REGISTRY: Record<string, GameDefinition> = {
       { keys: ["↑"], label: "propulsar" },
       { keys: ["ESPACIO"], label: "disparar" },
     ],
+    pad: {
+      left: "Rotar a la izquierda",
+      right: "Rotar a la derecha",
+      up: "Propulsar",
+      a: "Disparar",
+    },
   },
   // Tetris reemplaza al placeholder `caida` del catálogo (SPEC 07): el id no cambia.
   caida: {
@@ -55,6 +62,14 @@ export const REGISTRY: Record<string, GameDefinition> = {
       { keys: ["↓"], label: "bajar" },
       { keys: ["ESPACIO"], label: "caída" },
     ],
+    pad: {
+      left: "Mover a la izquierda",
+      right: "Mover a la derecha",
+      up: "Rotar",
+      down: "Bajar",
+      a: "Rotar",
+      b: "Caída",
+    },
   },
   // Arkanoid reemplaza al placeholder `bloque-buster` del catálogo (SPEC 08): el id no cambia.
   "bloque-buster": {
@@ -71,6 +86,11 @@ export const REGISTRY: Record<string, GameDefinition> = {
       { keys: ["A", "D"], label: "mover" },
       { keys: ["ESPACIO"], label: "lanzar" },
     ],
+    pad: {
+      left: "Mover a la izquierda",
+      right: "Mover a la derecha",
+      a: "Lanzar la bola",
+    },
   },
   // Snake reemplaza al placeholder `serpentina` del catálogo (SPEC 09): el id no cambia.
   serpentina: {
@@ -82,6 +102,12 @@ export const REGISTRY: Record<string, GameDefinition> = {
       { keys: ["←", "↑", "→", "↓"], label: "mover" },
       { keys: ["W", "A", "S", "D"], label: "mover" },
     ],
+    pad: {
+      up: "Arriba",
+      down: "Abajo",
+      left: "Izquierda",
+      right: "Derecha",
+    },
   },
 };
 

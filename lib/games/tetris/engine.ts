@@ -1,7 +1,12 @@
 // Motor de Tetris portado de references/started-games/03-tetris/game.js.
 // Recibe un <canvas> y avisa a React por callbacks; no conoce React ni el DOM global.
 
-import type { GameCallbacks, GameEngine, GameStats } from "../engine";
+import type {
+  GameCallbacks,
+  GameEngine,
+  GameStats,
+  VirtualButton,
+} from "../engine";
 import {
   BLOCK,
   COLS,
@@ -47,6 +52,11 @@ const PREVENT_KEYS = new Set([
   "Space",
 ]);
 
+// Autorepetición del gamepad táctil (SPEC 10): el teclado la obtiene del sistema, un toque mantenido no.
+const INPUT_REPEAT_DELAY_MS = 170;
+const INPUT_REPEAT_MS = 50;
+const MAX_REPEATS_PER_TICK = 4; // evita una ráfaga larga tras un frame lento
+
 const DEFAULTS: TetrisOptions = { skin: "retro", theme: "dark", startLevel: 1 };
 
 function clampLevel(value: unknown): number {
@@ -79,6 +89,7 @@ export class TetrisEngine implements GameEngine {
   private rafId: number | null = null;
   private lastTime: number | null = null;
   private paused = false;
+  private padHeld = new Map<VirtualButton, number>(); // botón con repetición → ms hasta la siguiente
   private listening = false;
   private destroyed = false;
   private lastStats: GameStats | null = null;
@@ -113,6 +124,7 @@ export class TetrisEngine implements GameEngine {
 
   pause() {
     this.paused = true;
+    this.releaseInput();
     this.stopLoop();
   }
 
@@ -125,6 +137,7 @@ export class TetrisEngine implements GameEngine {
   restart() {
     if (this.destroyed) return;
     this.paused = false;
+    this.releaseInput();
     this.initGame();
     this.startLoop();
   }
@@ -132,6 +145,7 @@ export class TetrisEngine implements GameEngine {
   end() {
     if (this.destroyed || this.gameOver) return;
     this.gameOver = true;
+    this.releaseInput();
     this.stopLoop();
     this.draw();
     this.settle();
@@ -140,8 +154,62 @@ export class TetrisEngine implements GameEngine {
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.releaseInput();
     this.stopLoop();
     this.removeListeners();
+  }
+
+  // Entrada del gamepad virtual (SPEC 10). Soltar siempre se procesa; pulsar se ignora
+  // en pausa o fin de partida. left/right/down actúan al pulsar y repiten mientras siguen pulsados.
+  setInput(button: VirtualButton, pressed: boolean) {
+    if (!pressed) {
+      this.padHeld.delete(button);
+      return;
+    }
+    if (this.destroyed || this.paused || this.gameOver) return;
+    if (this.padHeld.has(button)) return;
+    this.runPadAction(button);
+    if (button === "left" || button === "right" || button === "down") {
+      this.padHeld.set(button, INPUT_REPEAT_DELAY_MS);
+    }
+  }
+
+  releaseInput() {
+    this.padHeld.clear();
+  }
+
+  private runPadAction(button: VirtualButton) {
+    switch (button) {
+      case "left":
+        this.moveHorizontal(-1);
+        break;
+      case "right":
+        this.moveHorizontal(1);
+        break;
+      case "down":
+        this.softDrop();
+        break;
+      case "up":
+      case "a":
+        this.rotate();
+        break;
+      case "b":
+        this.hardDrop();
+        break;
+    }
+  }
+
+  // Repite los botones mantenidos: espera el retardo inicial y luego actúa cada INPUT_REPEAT_MS.
+  private repeatPadInput(dtMs: number) {
+    for (const [button, wait] of this.padHeld) {
+      let left = wait - dtMs;
+      for (let i = 0; left <= 0 && i < MAX_REPEATS_PER_TICK; i++) {
+        if (this.gameOver) return;
+        this.runPadAction(button);
+        left += INPUT_REPEAT_MS;
+      }
+      this.padHeld.set(button, Math.max(left, 0));
+    }
   }
 
   // ── Opciones en vivo ────────────────────────────────────────────────────────
@@ -354,6 +422,8 @@ export class TetrisEngine implements GameEngine {
 
   // Avanza el acumulador de caída; dtMs es el tiempo transcurrido entre frames.
   private tick(dtMs: number) {
+    if (this.gameOver) return;
+    this.repeatPadInput(dtMs);
     if (this.gameOver) return;
     this.dropAccum += dtMs;
     if (this.dropAccum >= this.dropInterval) {

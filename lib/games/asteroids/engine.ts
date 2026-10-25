@@ -14,7 +14,12 @@ import {
   rand,
   type Keys,
 } from "./entities";
-import type { GameCallbacks, GameEngine, GameStats } from "../engine";
+import type {
+  GameCallbacks,
+  GameEngine,
+  GameStats,
+  VirtualButton,
+} from "../engine";
 import { Pen } from "./pen";
 import {
   SKIN_NAMES,
@@ -40,6 +45,14 @@ const TRIPLE_DURATION = 10; // segundos de disparo triple
 const SHIELD_DURATION = 5; // segundos de escudo temporal
 const GAME_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "Space"]);
 
+// Botón del gamepad táctil → tecla equivalente (SPEC 10).
+const PAD_KEYS: Partial<Record<VirtualButton, string>> = {
+  left: "ArrowLeft",
+  right: "ArrowRight",
+  up: "ArrowUp",
+  a: "Space",
+};
+
 export class AsteroidsEngine implements GameEngine {
   private readonly pen: Pen;
   private readonly callbacks: GameCallbacks;
@@ -48,6 +61,8 @@ export class AsteroidsEngine implements GameEngine {
 
   private keys: Keys = {};
   private justPressed: Keys = {};
+  private padKeys: Keys = {}; // botones del gamepad táctil, aparte del teclado
+  private paused = false;
 
   private ship = new Ship();
   private bullets: Bullet[] = [];
@@ -119,17 +134,22 @@ export class AsteroidsEngine implements GameEngine {
   }
 
   pause() {
+    this.paused = true;
+    this.releaseInput();
     this.stopLoop();
   }
 
   resume() {
     if (this.destroyed) return;
+    this.paused = false;
     this.justPressed = {};
     this.startLoop();
   }
 
   restart() {
     if (this.destroyed) return;
+    this.paused = false;
+    this.releaseInput();
     this.justPressed = {};
     this.initGame();
     this.startLoop();
@@ -137,6 +157,7 @@ export class AsteroidsEngine implements GameEngine {
 
   end() {
     if (this.destroyed || this.state === "gameover") return;
+    this.releaseInput();
     this.state = "gameover";
     this.emitGameOver();
   }
@@ -144,6 +165,7 @@ export class AsteroidsEngine implements GameEngine {
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.releaseInput();
     this.stopLoop();
     this.removeListeners();
   }
@@ -204,6 +226,25 @@ export class AsteroidsEngine implements GameEngine {
     if (!AsteroidsEngine.isTextTarget(e)) e.preventDefault();
     this.keys[e.code] = false;
   };
+
+  // Entrada del gamepad virtual (SPEC 10): equivale a mantener la tecla del botón.
+  // Soltar siempre se procesa; pulsar se ignora en pausa o fin de partida.
+  setInput(button: VirtualButton, pressed: boolean) {
+    const code = PAD_KEYS[button];
+    if (!code) return;
+    if (!pressed) {
+      this.padKeys[code] = false;
+      return;
+    }
+    if (this.destroyed || this.paused || this.state === "gameover") return;
+    // Mismo flanco que el teclado: mantener `a` no encadena disparos.
+    if (!this.padKeys[code] && !this.keys[code]) this.justPressed[code] = true;
+    this.padKeys[code] = true;
+  }
+
+  releaseInput() {
+    this.padKeys = {};
+  }
 
   private pressed(code: string) {
     const val = this.justPressed[code];
@@ -326,7 +367,11 @@ export class AsteroidsEngine implements GameEngine {
     if (this.shieldTimer > 0) this.shieldTimer -= dt;
 
     const { ship } = this;
-    ship.update(dt, this.keys);
+    ship.update(dt, {
+      ArrowLeft: this.keys["ArrowLeft"] || this.padKeys["ArrowLeft"],
+      ArrowRight: this.keys["ArrowRight"] || this.padKeys["ArrowRight"],
+      ArrowUp: this.keys["ArrowUp"] || this.padKeys["ArrowUp"],
+    });
     this.bullets.forEach((b) => b.update(dt));
     this.asteroids.forEach((a) => a.update(dt));
     this.particles.forEach((p) => p.update(dt));

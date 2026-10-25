@@ -1,7 +1,12 @@
 // Motor de Arkanoid portado de references/started-games/04-arkanoid/game.js.
 // Recibe un <canvas> y avisa a React por callbacks; no conoce React ni el DOM global.
 
-import type { GameCallbacks, GameEngine, GameStats } from "../engine";
+import type {
+  GameCallbacks,
+  GameEngine,
+  GameStats,
+  VirtualButton,
+} from "../engine";
 
 import { LEVELS, LEVEL_CHARS, type BlockColor } from "./levels";
 import { Renderer } from "./render";
@@ -80,6 +85,7 @@ export class ArkanoidEngine implements GameEngine {
   private skin: ArkanoidSkin;
   private theme: ArkanoidTheme;
   private keys = new Set<string>();
+  private padHeld = new Set<VirtualButton>(); // botones del gamepad táctil, aparte del teclado
 
   private state: State = "ready";
   private level = 1;
@@ -180,6 +186,7 @@ export class ArkanoidEngine implements GameEngine {
     this.pausedAt = performance.now();
     // Una tecla soltada durante la pausa se quedaría «pulsada»
     this.keys.clear();
+    this.releaseInput();
     this.stopLoop();
     this.draw();
   }
@@ -201,6 +208,7 @@ export class ArkanoidEngine implements GameEngine {
     this.paused = false;
     this.pausedAt = null;
     this.keys.clear();
+    this.releaseInput();
     this.stopLoop();
     this.resetGame();
     this.startLoop();
@@ -208,6 +216,7 @@ export class ArkanoidEngine implements GameEngine {
 
   end() {
     if (this.destroyed || this.state === "gameover") return;
+    this.releaseInput();
     this.stopLoop();
     this.finish();
     this.draw();
@@ -219,6 +228,7 @@ export class ArkanoidEngine implements GameEngine {
     this.stopLoop();
     this.removeListeners();
     this.keys.clear();
+    this.releaseInput();
     this.stopSounds();
   }
 
@@ -293,6 +303,29 @@ export class ArkanoidEngine implements GameEngine {
     this.keys.delete(e.code);
   };
 
+  // Entrada del gamepad virtual (SPEC 10): left/right mantienen la paleta en movimiento
+  // y `a` lanza la bola, igual que ESPACIO (una vez por pulsación).
+  setInput(button: VirtualButton, pressed: boolean) {
+    if (button === "left" || button === "right") {
+      // Soltar siempre se procesa; pulsar se ignora en pausa o fin de partida.
+      if (!pressed) this.padHeld.delete(button);
+      else if (!this.destroyed && !this.paused && this.state !== "gameover")
+        this.padHeld.add(button);
+    } else if (
+      button === "a" &&
+      pressed &&
+      !this.destroyed &&
+      !this.paused &&
+      this.state === "ready"
+    ) {
+      this.launchBall();
+    }
+  }
+
+  releaseInput() {
+    this.padHeld.clear();
+  }
+
   // Velocidad (px/s, magnitud constante) del nivel activo.
   private levelSpeed() {
     return LEVELS[this.level - 1].speed;
@@ -362,8 +395,18 @@ export class ArkanoidEngine implements GameEngine {
     );
 
     let dir = 0;
-    if (this.keys.has("ArrowLeft") || this.keys.has("KeyA")) dir -= 1;
-    if (this.keys.has("ArrowRight") || this.keys.has("KeyD")) dir += 1;
+    if (
+      this.keys.has("ArrowLeft") ||
+      this.keys.has("KeyA") ||
+      this.padHeld.has("left")
+    )
+      dir -= 1;
+    if (
+      this.keys.has("ArrowRight") ||
+      this.keys.has("KeyD") ||
+      this.padHeld.has("right")
+    )
+      dir += 1;
     paddle.x += dir * PADDLE_SPEED * dt;
     paddle.x = Math.max(0, Math.min(W - paddle.w, paddle.x));
 

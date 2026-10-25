@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Courier_Prime, JetBrains_Mono, Press_Start_2P } from "next/font/google";
 import { Nav } from "@/components/nav";
 import { SessionProvider } from "@/lib/session";
@@ -25,6 +25,13 @@ const courierPrime = Courier_Prime({
 export const metadata: Metadata = {
   title: "Arcade Vault",
   description: "Play games online and compete for the highest score.",
+};
+
+// Sin `maximumScale`: bloquear el zoom perjudica la accesibilidad en el resto del sitio.
+// El zoom por doble toque se evita con `touch-action` solo en el área de juego.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
