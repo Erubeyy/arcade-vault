@@ -1,0 +1,1 @@
+- [Estado móvil por objetivo](project_mobile_status.md) — ranaria hecho; fallos compartidos abiertos (apaisado, textos 9-11 px) y trucos de entorno Playwright/Turbopack
