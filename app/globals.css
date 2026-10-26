@@ -1619,6 +1619,19 @@ html:has(.av-player.has-pad) {
   outline: 0;
   font-family: var(--mono);
 }
+/* narrow screens: the input's intrinsic width pushed the save button out of the modal at 375px */
+@media (max-width: 520px) {
+  .modal .input-row {
+    flex-wrap: wrap;
+  }
+  .modal .input-row input {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .modal .input-row .btn {
+    flex: 1 0 auto;
+  }
+}
 .modal .input-row input:focus {
   border-color: var(--cyan);
   box-shadow: 0 0 10px rgba(0, 245, 255, 0.35);

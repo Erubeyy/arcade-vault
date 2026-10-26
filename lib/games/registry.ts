@@ -7,6 +7,7 @@ import {
   FroggerEngine,
   W as FROGGER_W,
   H as FROGGER_H,
+  type FroggerOptions,
 } from "./frogger/engine";
 import {
   SnakeEngine,
@@ -116,7 +117,12 @@ export const REGISTRY: Record<string, GameDefinition> = {
   },
   // Frogger reemplaza al placeholder `ranaria` del catálogo (SPEC 11): el id no cambia.
   ranaria: {
-    create: (canvas, cb) => new FroggerEngine(canvas, cb),
+    create: (canvas, cb, options) =>
+      new FroggerEngine(
+        canvas,
+        cb,
+        options as Partial<FroggerOptions> | undefined,
+      ),
     width: FROGGER_W,
     height: FROGGER_H,
     controls: [
