@@ -26,7 +26,7 @@ El juego reemplaza al placeholder `ranaria` (ARCADE, `cover-rana`, `green`, `pos
 - Bocas destino: 5 bocas de 2 columnas cada una (columnas `[1,3)`, `[4,6)`, `[7,9)`, `[10,12)`, `[13,15)`); el resto de la fila 0 es muro y matar al tocarlo. Una boca ocupada que se vuelve a pisar mata. Al llenar las 5 se completa la ronda y empieza la siguiente.
 - Muertes: vehículo, caer al agua, tortuga que se sumerge bajo la rana, salir por los lados arrastrada, muro o boca ocupada en la fila 0, y agotar el temporizador de ronda.
 - Vidas: 3. Cada muerte resta una y la rana reaparece en la fila 13, columna 8. Al llegar a 0, se emite `onStats` con `lives: 0` y luego `onGameOver(score)` una sola vez.
-- Puntuación: +10 por cada fila avanzada hacia arriba por primera vez en la ronda; +50 al ocupar una boca más el bonus de tiempo (`segundos restantes × 10`, entero hacia abajo); +200 al completar la ronda.
+- Puntuación: +10 por cada fila avanzada hacia arriba por primera vez en cada cruce (el contador se reinicia al ocupar una boca o completar la ronda, no al morir); +50 al ocupar una boca más el bonus de tiempo (`segundos restantes × 10`, entero hacia abajo); +200 al completar la ronda.
 - Temporizador de ronda: 15 s en el nivel 1, 1 s menos por nivel con mínimo de 8 s. Se reinicia con cada reaparición y cada ronda.
 - Dificultad: cada nivel multiplica todas las velocidades por 1,15 (tope ×2,5 respecto al nivel 1).
 - Integración con `GamePlayer`: puntuación, nivel y vidas vienen de `onStats`; PAUSA, FIN y JUGAR DE NUEVO controlan el motor; el modal de guardar se abre en `onGameOver`. El resto del flujo (insert en `scores`, `av_scores`, `revalidateScores`, `controls-hint` desde `REGISTRY`) ya es genérico.
@@ -111,7 +111,7 @@ interface Frog {
 Estado interno del motor (encapsulado en la clase, no en globals):
 
 - `state`: `'playing' | 'gameover'`. La pausa es un indicador aparte (`paused`), porque la gestiona React.
-- `frog`, `lanes`, `goals: boolean[5]` (bocas ocupadas), `pendingDir` (un salto pendiente), `furthestRow` (fila más alta alcanzada en la ronda), `timeLeft` (ms), `lives`, `score`, `level`.
+- `frog`, `lanes`, `goals: boolean[5]` (bocas ocupadas), `pendingDir` (un salto pendiente), `furthestRow` (fila más alta alcanzada desde la última boca ocupada), `timeLeft` (ms), `lives`, `score`, `level`.
 
 Constantes del motor:
 
@@ -186,7 +186,7 @@ Antes de empezar, leer en `node_modules/next/dist/docs/01-app/` las guías de Se
 - [ ] La rana muere al llegar a una boca ocupada o al muro de la fila 0.
 - [ ] La rana muere al agotarse el temporizador de ronda; la barra de tiempo del canvas disminuye y cambia de verde a rojo.
 - [ ] Al morir se pierde una vida, la rana vuelve a la fila 13 y el temporizador se reinicia.
-- [ ] Avanzar a una fila nueva por primera vez en la ronda suma 10 puntos; volver atrás y repetir no suma.
+- [ ] Avanzar a una fila nueva por primera vez en un cruce suma 10 puntos; volver atrás y repetir no suma.
 - [ ] Ocupar una boca libre suma 50 puntos más `segundos restantes × 10` y la marca con la silueta de la rana.
 - [ ] Ocupar las 5 bocas suma 200 puntos, sube el nivel, vacía las bocas y reconstruye los carriles.
 - [ ] La velocidad de las entidades sube 15 % por nivel (tope ×2,5) y el temporizador baja 1 s por nivel (mínimo 8 s).
@@ -221,7 +221,7 @@ Antes de empezar, leer en `node_modules/next/dist/docs/01-app/` las guías de Se
 - **Sí:** velocidades en celdas/s (el spec original usaba px/frame): independientes de la tasa de refresco del monitor.
 - **Sí:** tortugas con ciclo de inmersión (3 s visibles / 1,5 s bajo el agua), con fase independiente por grupo.
 - **Sí:** 3 vidas y 5 bocas destino; el temporizador de 15 s baja 1 s por nivel hasta 8 s, y las velocidades suben 15 % por nivel con tope ×2,5 para que el juego no sea imposible.
-- **Sí:** el avance por filas (+10) se cuenta por ronda y no se reinicia al morir. Evita farmear puntos muriendo.
+- **Sí:** el avance por filas (+10) se cuenta por cruce: se reinicia al ocupar una boca (para que cada cruce puntúe) y no al morir (evita farmear puntos muriendo).
 - **Sí:** reaparición inmediata tras morir, sin animación de muerte.
 - **Sí:** flechas y `WASD`, solo en `keydown` sin `repeat`; un único salto pendiente.
 - **Sí:** guardar en Supabase y `localStorage` a la vez (SPEC 06).

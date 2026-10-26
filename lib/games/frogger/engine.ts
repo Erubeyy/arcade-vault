@@ -1,6 +1,8 @@
 // Motor de Frogger (SPEC 11). No tiene juego de referencia: las constantes se definen en el spec.
 // Recibe un <canvas> y avisa a React por callbacks; no conoce React ni el DOM global.
 
+import type { GameCallbacks, GameStats } from "../engine";
+
 export const W = 640;
 export const H = 560;
 
@@ -118,4 +120,217 @@ function buildLanes(level: number): Lane[] {
     }
     return { row: s.row, dir: s.dir, speed: s.speed * mult, entities };
   });
+}
+
+type Direction = "up" | "down" | "left" | "right";
+type State = "playing" | "gameover";
+
+const isRiverRow = (row: number) =>
+  row >= ROW_RIVER_TOP && row <= ROW_RIVER_BOT;
+const isRoadRow = (row: number) => row >= ROW_ROAD_TOP && row <= ROW_ROAD_BOT;
+const isSubmerged = (e: Entity) =>
+  e.kind === "turtle" && (e.phase ?? 0) >= TURTLE_UP_MS;
+const covers = (e: Entity, center: number) =>
+  center >= e.col && center < e.col + e.width;
+
+export class FroggerEngine {
+  private state: State = "playing";
+  private frog!: Frog;
+  private lanes: Lane[] = [];
+  private goals: boolean[] = GOALS.map(() => false); // bocas ocupadas
+  private pendingDir: Direction | null = null;
+  private furthestRow = ROW_START; // fila más alta alcanzada desde la última boca
+  private timeLeft = BASE_TIME_MS;
+  private lives = START_LIVES;
+  private score = 0;
+  private level = 1;
+
+  constructor(
+    private canvas: HTMLCanvasElement,
+    private cb: GameCallbacks,
+  ) {
+    this.reset();
+  }
+
+  // Estado de una partida nueva. No emite stats: lo hace quien llama.
+  private reset() {
+    this.state = "playing";
+    this.lives = START_LIVES;
+    this.score = 0;
+    this.level = 1;
+    this.goals = GOALS.map(() => false);
+    this.lanes = buildLanes(1);
+    this.furthestRow = ROW_START;
+    this.spawn();
+  }
+
+  private spawn() {
+    this.frog = {
+      col: START_COL,
+      row: ROW_START,
+      animating: false,
+      animT: 0,
+      fromCol: START_COL,
+      fromRow: ROW_START,
+      toCol: START_COL,
+      toRow: ROW_START,
+    };
+    this.pendingDir = null;
+    this.timeLeft = roundTimeMs(this.level);
+  }
+
+  private laneAt(row: number): Lane | undefined {
+    return this.lanes.find((l) => l.row === row);
+  }
+
+  private getSupport(): Entity | null {
+    const lane = this.laneAt(this.frog.row);
+    if (!lane) return null;
+    const center = this.frog.col + 0.5;
+    const e = lane.entities.find((en) => covers(en, center));
+    return e && !isSubmerged(e) ? e : null;
+  }
+
+  private checkRoadCollision(): boolean {
+    const lane = this.laneAt(this.frog.row);
+    if (!lane) return false;
+    const center = this.frog.col + 0.5;
+    return lane.entities.some((en) => covers(en, center));
+  }
+
+  // Avanza las entidades de cada carril y el ciclo de inmersión de las tortugas.
+  private moveLanes(dt: number) {
+    for (const lane of this.lanes) {
+      const dx = (lane.dir * lane.speed * dt) / 1000;
+      for (const e of lane.entities) {
+        e.col += dx;
+        if (lane.dir === 1 && e.col >= COLS) e.col -= LOOP_LEN;
+        else if (lane.dir === -1 && e.col + e.width <= 0) e.col += LOOP_LEN;
+        if (e.phase !== undefined) e.phase = (e.phase + dt) % TURTLE_CYCLE_MS;
+      }
+    }
+  }
+
+  // Un paso de simulación. Devuelve sin hacer nada si la partida terminó.
+  private update(dt: number) {
+    if (this.state !== "playing") return;
+    const frog = this.frog;
+
+    // Apoyo antes de mover el carril: la rana se queda con lo que tenía bajo los pies.
+    const riding = isRiverRow(frog.row) && !frog.animating;
+    const support = riding ? this.getSupport() : null;
+
+    this.moveLanes(dt);
+
+    if (riding) {
+      if (!support) return this.killFrog(); // agua o tortuga sumergida
+      const lane = this.laneAt(frog.row)!;
+      frog.col += (lane.dir * lane.speed * dt) / 1000;
+      const center = frog.col + 0.5;
+      if (center < 0 || center >= COLS) return this.killFrog();
+    }
+
+    if (!frog.animating && this.pendingDir) this.startJump(this.pendingDir);
+
+    if (frog.animating) {
+      frog.animT += dt;
+      if (frog.animT >= JUMP_MS) return this.land();
+    }
+
+    if (isRoadRow(frog.row) && this.checkRoadCollision()) {
+      return this.killFrog();
+    }
+
+    this.timeLeft -= dt;
+    if (this.timeLeft <= 0) this.killFrog();
+  }
+
+  private startJump(dir: Direction) {
+    const frog = this.frog;
+    this.pendingDir = null;
+    const toCol = frog.col + (dir === "left" ? -1 : dir === "right" ? 1 : 0);
+    const toRow = frog.row + (dir === "up" ? -1 : dir === "down" ? 1 : 0);
+    if (toCol < 0 || toCol > COLS - 1 || toRow < 0 || toRow > ROWS - 1) return;
+    frog.animating = true;
+    frog.animT = 0;
+    frog.fromCol = frog.col;
+    frog.fromRow = frog.row;
+    frog.toCol = toCol;
+    frog.toRow = toRow;
+  }
+
+  // Fin del salto: coloca la rana y resuelve la celda de destino.
+  private land() {
+    const frog = this.frog;
+    frog.animating = false;
+    frog.animT = 0;
+    frog.row = frog.toRow;
+    frog.col = frog.toCol;
+    // Fuera del río la columna vuelve a ser entera; en el río conserva la fracción del arrastre.
+    if (!isRiverRow(frog.row)) {
+      frog.col = Math.min(COLS - 1, Math.max(0, Math.round(frog.col)));
+    }
+
+    if (frog.row < this.furthestRow) {
+      this.score += (this.furthestRow - frog.row) * POINTS_ROW;
+      this.furthestRow = frog.row;
+      this.emitStats();
+    }
+
+    if (frog.row === ROW_GOALS) return this.checkGoal();
+    if (isRoadRow(frog.row) && this.checkRoadCollision())
+      return this.killFrog();
+    if (isRiverRow(frog.row) && !this.getSupport()) return this.killFrog();
+  }
+
+  private checkGoal() {
+    const center = this.frog.col + 0.5;
+    const i = GOALS.findIndex((g) => center >= g && center < g + GOAL_WIDTH);
+    if (i < 0 || this.goals[i]) return this.killFrog(); // muro o boca ocupada
+
+    this.goals[i] = true;
+    this.score += POINTS_GOAL + Math.floor(this.timeLeft / 1000) * POINTS_TIME;
+    this.furthestRow = ROW_START;
+    if (this.goals.every(Boolean)) return this.completeRound();
+    this.spawn();
+    this.emitStats();
+  }
+
+  private completeRound() {
+    this.score += POINTS_ROUND;
+    this.level += 1;
+    this.goals = GOALS.map(() => false);
+    this.lanes = buildLanes(this.level);
+    this.furthestRow = ROW_START;
+    this.spawn();
+    this.emitStats();
+  }
+
+  private killFrog() {
+    this.lives -= 1;
+    if (this.lives <= 0) {
+      this.lives = 0;
+      this.state = "gameover";
+      this.emitStats();
+      this.cb.onGameOver(this.score);
+      return;
+    }
+    this.spawn();
+    this.emitStats();
+  }
+
+  private lastStats = "";
+
+  // Solo avisa cuando cambia algún valor.
+  private emitStats() {
+    const stats: GameStats = {
+      score: this.score,
+      level: this.level,
+      lives: this.lives,
+    };
+    const key = `${stats.score}|${stats.level}|${stats.lives}`;
+    if (key === this.lastStats) return;
+    this.lastStats = key;
+    this.cb.onStats(stats);
+  }
 }
