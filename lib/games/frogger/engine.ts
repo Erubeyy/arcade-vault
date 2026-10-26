@@ -1,7 +1,12 @@
 // Motor de Frogger (SPEC 11). No tiene juego de referencia: las constantes se definen en el spec.
 // Recibe un <canvas> y avisa a React por callbacks; no conoce React ni el DOM global.
 
-import type { GameCallbacks, GameStats } from "../engine";
+import type {
+  GameCallbacks,
+  GameEngine,
+  GameStats,
+  VirtualButton,
+} from "../engine";
 
 export const W = 640;
 export const H = 560;
@@ -166,7 +171,26 @@ const isSubmerged = (e: Entity) =>
 const covers = (e: Entity, center: number) =>
   center >= e.col && center < e.col + e.width;
 
-export class FroggerEngine {
+const KEY_DIRS: Record<string, Direction> = {
+  ArrowUp: "up",
+  ArrowDown: "down",
+  ArrowLeft: "left",
+  ArrowRight: "right",
+  KeyW: "up",
+  KeyS: "down",
+  KeyA: "left",
+  KeyD: "right",
+};
+
+// Los botones a/b del gamepad virtual no se usan en Frogger.
+const PAD_DIRS: Partial<Record<VirtualButton, Direction>> = {
+  up: "up",
+  down: "down",
+  left: "left",
+  right: "right",
+};
+
+export class FroggerEngine implements GameEngine {
   private state: State = "playing";
   private frog!: Frog;
   private lanes: Lane[] = [];
@@ -180,12 +204,150 @@ export class FroggerEngine {
   private facing = 0; // rotación de la rana en radianes (0 = mira arriba)
   private ctx: CanvasRenderingContext2D;
 
+  private started = false;
+  private paused = false;
+  private destroyed = false;
+  private listening = false;
+  private rafId: number | null = null;
+  private lastTime: number | null = null;
+
   constructor(
     private canvas: HTMLCanvasElement,
     private cb: GameCallbacks,
   ) {
     this.ctx = canvas.getContext("2d")!;
     this.reset();
+  }
+
+  // ── Ciclo de vida ───────────────────────────────────────────────────────────
+
+  start() {
+    if (this.destroyed || this.started) return;
+    this.started = true;
+    this.resetGame();
+    this.addListeners();
+    this.startLoop();
+  }
+
+  pause() {
+    if (this.destroyed || this.paused) return;
+    this.paused = true;
+    // Un salto pendiente durante la pausa se ejecutaría de golpe al reanudar.
+    this.pendingDir = null;
+    this.stopLoop();
+    this.draw();
+  }
+
+  resume() {
+    if (this.destroyed || !this.paused) return;
+    this.paused = false;
+    if (this.state !== "gameover") this.startLoop();
+  }
+
+  restart() {
+    if (this.destroyed) return;
+    this.paused = false;
+    this.stopLoop();
+    this.resetGame();
+    this.startLoop();
+  }
+
+  end() {
+    if (this.destroyed || this.state === "gameover") return;
+    this.stopLoop();
+    this.state = "gameover";
+    this.pendingDir = null;
+    this.cb.onGameOver(this.score);
+    this.draw();
+  }
+
+  destroy() {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.stopLoop();
+    this.removeListeners();
+    this.pendingDir = null;
+  }
+
+  // Entrada del gamepad virtual (SPEC 10): cada pulsación es un salto, igual que una flecha.
+  setInput(button: VirtualButton, pressed: boolean) {
+    if (!pressed) return;
+    const dir = PAD_DIRS[button];
+    if (dir) this.queueJump(dir);
+  }
+
+  // Los saltos son puntuales y no hay botones «mantenidos» que soltar.
+  releaseInput() {
+    this.pendingDir = null;
+  }
+
+  // ── Loop ────────────────────────────────────────────────────────────────────
+
+  private startLoop() {
+    if (this.rafId !== null || this.destroyed || this.state === "gameover") {
+      return;
+    }
+    this.lastTime = null; // evita un salto de dt tras pausar
+    this.rafId = requestAnimationFrame(this.loop);
+  }
+
+  private stopLoop() {
+    if (this.rafId !== null) cancelAnimationFrame(this.rafId);
+    this.rafId = null;
+  }
+
+  private loop = (now: number) => {
+    const dt =
+      this.lastTime === null ? 0 : Math.min(now - this.lastTime, MAX_FRAME_MS);
+    this.lastTime = now;
+    this.update(dt);
+    this.draw();
+    // El fin de partida puede llegar dentro de este mismo frame: no se reprograma.
+    this.rafId =
+      this.state === "gameover" ? null : requestAnimationFrame(this.loop);
+  };
+
+  // ── Teclado ─────────────────────────────────────────────────────────────────
+
+  private addListeners() {
+    if (this.listening) return;
+    this.listening = true;
+    window.addEventListener("keydown", this.onKeyDown);
+  }
+
+  private removeListeners() {
+    if (!this.listening) return;
+    this.listening = false;
+    window.removeEventListener("keydown", this.onKeyDown);
+  }
+
+  private onKeyDown = (e: KeyboardEvent) => {
+    // Al escribir iniciales o usar un selector, las teclas no llegan al juego.
+    const t = e.target;
+    if (
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLTextAreaElement ||
+      t instanceof HTMLSelectElement
+    )
+      return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    const dir = KEY_DIRS[e.code];
+    if (!dir) return;
+    e.preventDefault();
+    if (e.repeat) return;
+    this.queueJump(dir);
+  };
+
+  private queueJump(dir: Direction) {
+    if (this.destroyed || this.paused || this.state === "gameover") return;
+    this.pendingDir = dir; // un solo salto pendiente: la última pulsación gana
+  }
+
+  // Reinicia la partida y avisa a React.
+  private resetGame() {
+    this.reset();
+    this.emitStats(true);
   }
 
   // Estado de una partida nueva. No emite stats: lo hace quien llama.
@@ -359,14 +521,14 @@ export class FroggerEngine {
   private lastStats = "";
 
   // Solo avisa cuando cambia algún valor.
-  private emitStats() {
+  private emitStats(force = false) {
     const stats: GameStats = {
       score: this.score,
       level: this.level,
       lives: this.lives,
     };
     const key = `${stats.score}|${stats.level}|${stats.lives}`;
-    if (key === this.lastStats) return;
+    if (!force && key === this.lastStats) return;
     this.lastStats = key;
     this.cb.onStats(stats);
   }
