@@ -4,6 +4,11 @@ import { AsteroidsEngine, type AsteroidsOptions } from "./asteroids/engine";
 import type { EngineFactory, VirtualButton } from "./engine";
 import { ArkanoidEngine, type ArkanoidOptions } from "./arkanoid/engine";
 import {
+  FroggerEngine,
+  W as FROGGER_W,
+  H as FROGGER_H,
+} from "./frogger/engine";
+import {
   SnakeEngine,
   W as SNAKE_W,
   H as SNAKE_H,
@@ -107,6 +112,22 @@ export const REGISTRY: Record<string, GameDefinition> = {
       down: "Abajo",
       left: "Izquierda",
       right: "Derecha",
+    },
+  },
+  // Frogger reemplaza al placeholder `ranaria` del catálogo (SPEC 11): el id no cambia.
+  ranaria: {
+    create: (canvas, cb) => new FroggerEngine(canvas, cb),
+    width: FROGGER_W,
+    height: FROGGER_H,
+    controls: [
+      { keys: ["←", "↑", "→", "↓"], label: "saltar" },
+      { keys: ["W", "A", "S", "D"], label: "saltar" },
+    ],
+    pad: {
+      up: "Saltar arriba",
+      down: "Saltar abajo",
+      left: "Saltar a la izquierda",
+      right: "Saltar a la derecha",
     },
   },
 };
