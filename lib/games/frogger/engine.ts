@@ -125,6 +125,39 @@ function buildLanes(level: number): Lane[] {
 type Direction = "up" | "down" | "left" | "right";
 type State = "playing" | "gameover";
 
+const FACING: Record<Direction, number> = {
+  up: 0,
+  right: Math.PI / 2,
+  down: Math.PI,
+  left: -Math.PI / 2,
+};
+
+const COLORS = {
+  road: "#15171d",
+  roadLine: "#3a3f4d",
+  water: "#0a2a4d",
+  waterLine: "#14487a",
+  grass: "#12391f",
+  wall: "#0b2514",
+  goal: "#1f7a3d",
+  goalBorder: "#f2c14e",
+  log: "#7a4a24",
+  logLine: "#5a3416",
+  shell: "#3fae5a",
+  shellLine: "#25793a",
+  frog: "#8dff4a",
+  frogDark: "#4fb82a",
+  eye: "#ffffff",
+  pupil: "#0a1f0a",
+  cars: ["#e5483f", "#f2c14e", "#3d8bff", "#c46bff", "#ff8a3d"],
+  truckBody: "#8b93a3",
+  truckCab: "#d8dde6",
+  wheel: "#0c0d10",
+  timeOk: "#4cd964",
+  timeWarn: "#f2c14e",
+  timeLow: "#ff453a",
+};
+
 const isRiverRow = (row: number) =>
   row >= ROW_RIVER_TOP && row <= ROW_RIVER_BOT;
 const isRoadRow = (row: number) => row >= ROW_ROAD_TOP && row <= ROW_ROAD_BOT;
@@ -144,11 +177,14 @@ export class FroggerEngine {
   private lives = START_LIVES;
   private score = 0;
   private level = 1;
+  private facing = 0; // rotación de la rana en radianes (0 = mira arriba)
+  private ctx: CanvasRenderingContext2D;
 
   constructor(
     private canvas: HTMLCanvasElement,
     private cb: GameCallbacks,
   ) {
+    this.ctx = canvas.getContext("2d")!;
     this.reset();
   }
 
@@ -251,6 +287,7 @@ export class FroggerEngine {
     const toCol = frog.col + (dir === "left" ? -1 : dir === "right" ? 1 : 0);
     const toRow = frog.row + (dir === "up" ? -1 : dir === "down" ? 1 : 0);
     if (toCol < 0 || toCol > COLS - 1 || toRow < 0 || toRow > ROWS - 1) return;
+    this.facing = FACING[dir];
     frog.animating = true;
     frog.animT = 0;
     frog.fromCol = frog.col;
@@ -332,5 +369,282 @@ export class FroggerEngine {
     if (key === this.lastStats) return;
     this.lastStats = key;
     this.cb.onStats(stats);
+  }
+
+  private draw() {
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, W, H);
+    this.drawBackground(ctx);
+    this.drawGoals(ctx);
+    for (const lane of this.lanes) {
+      for (const e of lane.entities) this.drawEntity(ctx, lane, e);
+    }
+    this.drawFrog(ctx);
+    this.drawTimeBar(ctx);
+  }
+
+  private drawBackground(ctx: CanvasRenderingContext2D) {
+    const zone = (r0: number, r1: number, color: string) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(0, r0 * CELL, W, (r1 - r0 + 1) * CELL);
+    };
+    zone(ROW_GOALS, ROW_GOALS, COLORS.wall);
+    zone(ROW_RIVER_TOP, ROW_RIVER_BOT, COLORS.water);
+    zone(ROW_SAFE_MID, ROW_SAFE_MID, COLORS.grass);
+    zone(ROW_ROAD_TOP, ROW_ROAD_BOT, COLORS.road);
+    zone(ROW_START, ROW_START, COLORS.grass);
+
+    // Olas sutiles en el río.
+    ctx.strokeStyle = COLORS.waterLine;
+    ctx.lineWidth = 1;
+    for (let r = ROW_RIVER_TOP; r <= ROW_RIVER_BOT; r++) {
+      const y = r * CELL + CELL / 2;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 8) {
+        const yy = y + Math.sin((x + r * 17) / 11) * 3;
+        if (x === 0) ctx.moveTo(x, yy);
+        else ctx.lineTo(x, yy);
+      }
+      ctx.stroke();
+    }
+
+    // Líneas discontinuas entre carriles de carretera.
+    ctx.strokeStyle = COLORS.roadLine;
+    ctx.setLineDash([14, 14]);
+    for (let r = ROW_ROAD_TOP + 1; r <= ROW_ROAD_BOT; r++) {
+      ctx.beginPath();
+      ctx.moveTo(0, r * CELL);
+      ctx.lineTo(W, r * CELL);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  private drawGoals(ctx: CanvasRenderingContext2D) {
+    GOALS.forEach((g, i) => {
+      const x = g * CELL;
+      const w = GOAL_WIDTH * CELL;
+      ctx.fillStyle = COLORS.goal;
+      ctx.fillRect(x + 2, 2, w - 4, CELL - 4);
+      ctx.strokeStyle = COLORS.goalBorder;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 3, 3, w - 6, CELL - 6);
+      if (this.goals[i]) {
+        this.paintFrog(ctx, x + w / 2, CELL / 2, 1, 0, false);
+      }
+    });
+  }
+
+  private drawEntity(ctx: CanvasRenderingContext2D, lane: Lane, e: Entity) {
+    const x = e.col * CELL;
+    const y = lane.row * CELL;
+    const w = e.width * CELL;
+    switch (e.kind) {
+      case "log":
+        ctx.fillStyle = COLORS.log;
+        ctx.beginPath();
+        ctx.roundRect(x, y + 6, w, CELL - 12, 10);
+        ctx.fill();
+        ctx.strokeStyle = COLORS.logLine;
+        ctx.lineWidth = 2;
+        for (let k = 1; k < e.width * 2; k++) {
+          const lx = x + (k * w) / (e.width * 2);
+          ctx.beginPath();
+          ctx.moveTo(lx, y + 11);
+          ctx.lineTo(lx + 4, y + CELL - 11);
+          ctx.stroke();
+        }
+        break;
+      case "turtle":
+        this.drawTurtles(ctx, e, x, y);
+        break;
+      case "car":
+        this.drawCar(ctx, lane, e, x, y, w);
+        break;
+      case "truck":
+        this.drawTruck(ctx, lane, x, y, w);
+        break;
+    }
+  }
+
+  private drawTurtles(
+    ctx: CanvasRenderingContext2D,
+    e: Entity,
+    x: number,
+    y: number,
+  ) {
+    const phase = e.phase ?? 0;
+    const under = phase >= TURTLE_UP_MS;
+    // Parpadea justo antes de sumergirse para avisar al jugador.
+    const warning = !under && phase >= TURTLE_UP_MS - 600;
+    const blink = warning && Math.floor(phase / 150) % 2 === 0;
+    for (let k = 0; k < e.width; k++) {
+      const cx = x + k * CELL + CELL / 2;
+      const cy = y + CELL / 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 16, 0, Math.PI * 2);
+      if (under) {
+        ctx.strokeStyle = COLORS.shell;
+        ctx.globalAlpha = 0.3;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      ctx.globalAlpha = blink ? 0.45 : 1;
+      ctx.fillStyle = COLORS.shell;
+      ctx.fill();
+      ctx.strokeStyle = COLORS.shellLine;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 9, 0, Math.PI * 2);
+      ctx.moveTo(cx - 16, cy);
+      ctx.lineTo(cx - 9, cy);
+      ctx.moveTo(cx + 9, cy);
+      ctx.lineTo(cx + 16, cy);
+      ctx.moveTo(cx, cy - 16);
+      ctx.lineTo(cx, cy - 9);
+      ctx.moveTo(cx, cy + 9);
+      ctx.lineTo(cx, cy + 16);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  private drawCar(
+    ctx: CanvasRenderingContext2D,
+    lane: Lane,
+    e: Entity,
+    x: number,
+    y: number,
+    w: number,
+  ) {
+    ctx.fillStyle = COLORS.cars[lane.row % COLORS.cars.length];
+    ctx.beginPath();
+    ctx.roundRect(x + 3, y + 8, w - 6, CELL - 16, 6);
+    ctx.fill();
+    // Parabrisas en el lado hacia el que avanza.
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    const wx = lane.dir === 1 ? x + w - 13 : x + 7;
+    ctx.fillRect(wx, y + 12, 6, CELL - 24);
+    this.drawWheels(ctx, x, y, w, e.width);
+  }
+
+  private drawTruck(
+    ctx: CanvasRenderingContext2D,
+    lane: Lane,
+    x: number,
+    y: number,
+    w: number,
+  ) {
+    const cabW = CELL - 4;
+    const cabX = lane.dir === 1 ? x + w - cabW - 2 : x + 2;
+    const trailerX = lane.dir === 1 ? x + 2 : x + cabW + 4;
+    ctx.fillStyle = COLORS.truckBody;
+    ctx.beginPath();
+    ctx.roundRect(trailerX, y + 7, w - cabW - 6, CELL - 14, 3);
+    ctx.fill();
+    ctx.fillStyle = COLORS.truckCab;
+    ctx.beginPath();
+    ctx.roundRect(cabX, y + 9, cabW, CELL - 18, 5);
+    ctx.fill();
+    ctx.fillStyle = COLORS.pupil;
+    const wx = lane.dir === 1 ? cabX + cabW - 9 : cabX + 3;
+    ctx.fillRect(wx, y + 13, 6, CELL - 26);
+    this.drawWheels(ctx, x, y, w, 3);
+  }
+
+  private drawWheels(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    cells: number,
+  ) {
+    ctx.fillStyle = COLORS.wheel;
+    const xs =
+      cells >= 3 ? [x + 11, x + w / 2, x + w - 11] : [x + 11, x + w - 11];
+    for (const wx of xs) {
+      for (const wy of [y + 8, y + CELL - 8]) {
+        ctx.beginPath();
+        ctx.arc(wx, wy, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  private drawFrog(ctx: CanvasRenderingContext2D) {
+    const f = this.frog;
+    let col = f.col;
+    let row: number = f.row;
+    let leap = 0;
+    if (f.animating) {
+      const t = Math.min(1, f.animT / JUMP_MS);
+      col = f.fromCol + (f.toCol - f.fromCol) * t;
+      row = f.fromRow + (f.toRow - f.fromRow) * t;
+      leap = Math.sin(t * Math.PI);
+    }
+    this.paintFrog(
+      ctx,
+      col * CELL + CELL / 2,
+      row * CELL + CELL / 2,
+      1 + leap * 0.25,
+      this.facing,
+      leap > 0.05,
+    );
+  }
+
+  // Rana de primitivas: cuerpo elíptico 28×24, dos ojos y patas que se abren en el salto.
+  private paintFrog(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    scale: number,
+    angle: number,
+    leaping: boolean,
+  ) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    ctx.scale(scale, scale);
+    const spread = leaping ? 6 : 0;
+    ctx.fillStyle = COLORS.frogDark;
+    for (const [lx, ly] of [
+      [-13, -8 - spread],
+      [13, -8 - spread],
+      [-13, 8 + spread],
+      [13, 8 + spread],
+    ]) {
+      ctx.beginPath();
+      ctx.ellipse(lx, ly, 5, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = COLORS.frog;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 12, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+    for (const ex of [-6, 6]) {
+      ctx.fillStyle = COLORS.eye;
+      ctx.beginPath();
+      ctx.arc(ex, -9, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = COLORS.pupil;
+      ctx.beginPath();
+      ctx.arc(ex, -10, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Barra de tiempo en el borde inferior de la franja de inicio.
+  private drawTimeBar(ctx: CanvasRenderingContext2D) {
+    const ratio = Math.max(0, this.timeLeft / roundTimeMs(this.level));
+    ctx.fillStyle =
+      ratio > 0.5
+        ? COLORS.timeOk
+        : ratio > 0.25
+          ? COLORS.timeWarn
+          : COLORS.timeLow;
+    ctx.fillRect(0, H - 8, W * ratio, 8);
   }
 }
