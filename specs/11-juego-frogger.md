@@ -1,6 +1,6 @@
 # SPEC 11 — Juego Frogger jugable dentro de Arcade Vault con leaderboard
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** SPEC 05, SPEC 06, SPEC 09, SPEC 10
 > **Fecha:** 2026-10-25
 > **Objetivo:** Crear Frogger como motor de canvas desacoplado (carretera, río con troncos y tortugas, cinco bocas destino, vidas, niveles y temporizador de ronda), registrarlo en `REGISTRY` reemplazando el placeholder `ranaria` y guardar sus marcas en el leaderboard de Supabase.
