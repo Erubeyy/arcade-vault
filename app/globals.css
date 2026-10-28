@@ -1794,6 +1794,18 @@ html:has(.av-player.has-pad) {
   opacity: 0.5;
   cursor: not-allowed;
 }
+.auth-link {
+  display: block;
+  margin: -4px 0 12px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--cyan);
+}
+.auth-link:hover {
+  text-decoration: underline;
+}
 .auth-msg {
   margin: 0 0 12px;
   font-family: var(--mono);

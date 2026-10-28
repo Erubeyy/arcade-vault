@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import {
@@ -268,6 +269,12 @@ export function AuthForm() {
               required
             />
           </div>
+
+          {tab === "in" && (
+            <Link className="auth-link" href="/recuperar">
+              ¿Olvidaste tu contraseña?
+            </Link>
+          )}
 
           {error && (
             <p className="auth-msg error" role="alert">
