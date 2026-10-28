@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import type { Game } from "@/lib/games";
 import { queryTopScores, type ScoreRow } from "@/lib/scores-query";
-import { useSession, type SavedScore } from "@/lib/session";
+import { useSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/client";
 
 const fmt = (n: number) => n.toLocaleString("es-ES");
@@ -14,20 +14,7 @@ const fmtDate = (ms: number) => {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 };
 
-const SCORES_KEY = "av_scores";
-
-function subscribeScores(listener: () => void) {
-  window.addEventListener("storage", listener);
-  return () => window.removeEventListener("storage", listener);
-}
-function getLocalScores(): string | null {
-  try {
-    return localStorage.getItem(SCORES_KEY);
-  } catch {
-    return null;
-  }
-}
-const getServerLocalScores = (): string | null => null;
+type Mine = { key: string; score: number; at: number } | null;
 
 type Result = { tab: string; rows: ScoreRow[]; failed: boolean };
 
@@ -46,7 +33,7 @@ function PodiumSlot({ cls, num, row, big }: { cls: string; num: string; row?: Sc
 }
 
 export function HallOfFame({ games }: { games: Game[] }) {
-  const { user } = useSession();
+  const { user, status } = useSession();
   const [tab, setTab] = useState(games[0].id);
   const [result, setResult] = useState<Result | null>(null);
   const [supabase] = useState(() => createClient());
@@ -66,18 +53,41 @@ export function HallOfFame({ games }: { games: Game[] }) {
   const rows = loading || !result ? [] : result.rows;
   const failed = !loading && !!result?.failed;
 
-  const rawLocal = useSyncExternalStore(subscribeScores, getLocalScores, getServerLocalScores);
-  const mine = (() => {
-    if (!rawLocal) return null;
-    try {
-      const all: SavedScore[] = JSON.parse(rawLocal);
-      return all
-        .filter((e) => e.game === tab)
-        .reduce<SavedScore | null>((best, e) => (!best || e.score > best.score ? e : best), null);
-    } catch {
-      return null;
-    }
-  })();
+  // Mejor marca del usuario: consulta a Supabase por game_id y name = username.
+  const username = status === "ready" ? (user?.username ?? null) : null;
+  const [mineResult, setMineResult] = useState<Mine>(null);
+
+  useEffect(() => {
+    if (!username) return;
+    let cancelled = false;
+    supabase
+      .from("scores")
+      .select("score, created_at")
+      .eq("game_id", tab)
+      .eq("name", username)
+      .order("score", { ascending: false })
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setMineResult(
+          data
+            ? {
+                key: `${tab}:${username}`,
+                score: data.score,
+                at: Date.parse(data.created_at),
+              }
+            : null,
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, tab, username]);
+
+  const mine =
+    username && mineResult?.key === `${tab}:${username}` ? mineResult : null;
 
   return (
     <div className="av-hall fade-in">
@@ -133,12 +143,12 @@ export function HallOfFame({ games }: { games: Game[] }) {
             <div className="dt">{r.date}</div>
           </div>
         ))}
-        {user && mine && (
+        {username && mine && (
           <>
             <div className="tr you-label">▸ TU MEJOR MARCA EN {game.title}</div>
             <div className="tr you">
               <div className="rk" style={{ color: "var(--yellow)" }}>—</div>
-              <div className="pl" style={{ color: "var(--yellow)" }}>{mine.name}</div>
+              <div className="pl" style={{ color: "var(--yellow)" }}>{username}</div>
               <div className="sc" style={{ color: "var(--yellow)", textShadow: "0 0 6px rgba(245,255,0,0.5)" }}>
                 {fmt(mine.score)}
               </div>

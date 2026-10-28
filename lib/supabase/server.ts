@@ -19,7 +19,7 @@ export async function createClient() {
               cookieStore.set(name, value, options),
             );
           } catch {
-            // cookies().set falla en Server Components; se ignora hasta que exista un proxy que refresque la sesión.
+            // cookies().set falla en Server Components; proxy.ts ya refresca la sesión.
           }
         },
       },
