@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import {
   authErrorMessage,
@@ -20,7 +20,12 @@ export function AuthForm() {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const [error, setError] = useState<string | null>(() =>
+    searchParams.get("error") === "enlace"
+      ? "El enlace caducó o no es válido. Solicita uno nuevo."
+      : null,
+  );
   const [notice, setNotice] = useState<string | null>(null);
   // Correo con el que se registró: activa el panel «REVISA TU CORREO».
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -109,6 +114,27 @@ export function AuthForm() {
     } catch (err) {
       setError(authErrorMessage(err as Error));
     } finally {
+      setBusy(false);
+    }
+  };
+
+  const oauth = async (provider: "google" | "github") => {
+    if (busy) return;
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: callbackUrl() },
+      });
+      if (error) {
+        setError(authErrorMessage(error));
+        setBusy(false);
+      }
+      // Sin error el navegador sale hacia el proveedor: se deja el botón bloqueado.
+    } catch (err) {
+      setError(authErrorMessage(err as Error));
       setBusy(false);
     }
   };
@@ -274,14 +300,23 @@ export function AuthForm() {
 
         <div className="auth-divider">O CONTINÚA CON</div>
         <div className="social">
-          <button className="btn ghost" type="button" disabled>
+          <button
+            className="btn ghost"
+            type="button"
+            disabled={busy}
+            onClick={() => oauth("google")}
+          >
             ◆ GOOGLE
           </button>
-          <button className="btn ghost" type="button" disabled>
+          <button
+            className="btn ghost"
+            type="button"
+            disabled={busy}
+            onClick={() => oauth("github")}
+          >
             ▣ GITHUB
           </button>
         </div>
-        <div className="auth-soon">PRÓXIMAMENTE</div>
 
         <div
           style={{
