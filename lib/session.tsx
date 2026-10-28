@@ -16,6 +16,7 @@ export interface User {
   id: string;
   email: string | null;
   username: string | null; // null = autenticado sin perfil
+  avatarUrl: string | null; // foto del proveedor OAuth, si existe
 }
 
 export type SessionStatus = "loading" | "guest" | "needs-profile" | "ready";
@@ -24,6 +25,11 @@ interface SessionValue {
   user: User | null;
   status: SessionStatus;
   signOut: () => Promise<void>;
+}
+
+function avatarFrom(meta: Record<string, unknown> | undefined): string | null {
+  const url = meta?.avatar_url ?? meta?.picture;
+  return typeof url === "string" && url.startsWith("https://") ? url : null;
 }
 
 type State = { status: SessionStatus; user: User | null };
@@ -55,6 +61,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           id: session.user.id,
           email: session.user.email ?? null,
           username,
+          avatarUrl: avatarFrom(session.user.user_metadata),
         },
       });
     };
