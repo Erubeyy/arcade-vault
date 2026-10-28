@@ -1,6 +1,6 @@
 # SPEC 13 — Medidas de seguridad básicas (RLS, contraseñas, rate limit y headers)
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** SPEC 04, SPEC 06, SPEC 12
 > **Fecha:** 2026-10-27
 > **Objetivo:** Cerrar el checklist de `references/security/security-checklist.md`: verificar RLS en todas las tablas, exigir contraseñas de 8+ caracteres, limitar registros por IP, añadir headers de seguridad en Next.js y resolver los warnings del advisor de seguridad de Supabase que se puedan corregir.
