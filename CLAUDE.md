@@ -30,23 +30,26 @@ npm run lint    # eslint (flat config, eslint.config.mjs)
 - `skin-designer` (project subagent, `.claude/agents/skin-designer.md`): `skin-designer: <game>` ensures ONE real game has at least 3 skins (`classic` as default, `neon`, `retro`), all readable in dark and light mode, with a selector in its options panel and persisted preferences; verifies with Playwright and records the result in `references/game-with-themes.md`.
 - `mobile-porter` (project subagent, `.claude/agents/mobile-porter.md`): `mobile-porter: <route or game>` audits and fixes ONE route or real game for mobile browsers (portrait and landscape, desktop untouched), using spec 10 as reference, verifies with Playwright at 375×667, 390×844, 844×390 and 1280×800, and records the result in `references/mobile-ready.md`. Browser only (no PWA/native).
 
-`game-planner`, `skin-designer` and `mobile-porter` use `memory: project`; their notes live in `.claude/agent-memory/<agent>/`.
+- `security-auditor` (project subagent, `.claude/agents/security-auditor.md`): `security-auditor: <db | app | todo | spec NN | rama>` audits Supabase (RLS, policies, grants, `SECURITY DEFINER`, advisors, logs, migration drift) and the Next.js app (secrets, headers, auth callback, server actions, XSS, `npm audit`) against specs 12–13. Read-only: proposes fixes, never applies them. Records findings in `references/security/audit-log.md` and keeps `security-checklist.md` current.
+
+`game-planner`, `skin-designer`, `mobile-porter` and `security-auditor` use `memory: project`; their notes live in `.claude/agent-memory/<agent>/`.
 
 ## Specs implemented
 
-| Spec   | Content                                                                       |
-| ------ | ----------------------------------------------------------------------------- |
-| 01     | MVP of the visual screens (library, game detail, player, hall of fame, login) |
-| 02, 03 | Home, nav, About page and contact form (Resend)                               |
-| 04     | Supabase connection (`@supabase/ssr`)                                         |
-| 05     | Asteroids (first real game)                                                   |
-| 06     | `games` / `scores` in Supabase, dynamic catalog and leaderboard               |
-| 07     | Tetris (replaces placeholder `caida`)                                         |
-| 08     | Arkanoid (replaces placeholder `bloque-buster`)                               |
-| 09     | Snake (replaces placeholder `serpentina`)                                     |
-| 10     | Touch controls: virtual gamepad (d-pad + A/B) under the canvas                |
-| 11     | Frogger (replaces placeholder `ranaria`)                                      |
+| Spec   | Content                                                                             |
+| ------ | ----------------------------------------------------------------------------------- |
+| 01     | MVP of the visual screens (library, game detail, player, hall of fame, login)       |
+| 02, 03 | Home, nav, About page and contact form (Resend)                                     |
+| 04     | Supabase connection (`@supabase/ssr`)                                               |
+| 05     | Asteroids (first real game)                                                         |
+| 06     | `games` / `scores` in Supabase, dynamic catalog and leaderboard                     |
+| 07     | Tetris (replaces placeholder `caida`)                                               |
+| 08     | Arkanoid (replaces placeholder `bloque-buster`)                                     |
+| 09     | Snake (replaces placeholder `serpentina`)                                           |
+| 10     | Touch controls: virtual gamepad (d-pad + A/B) under the canvas                      |
+| 11     | Frogger (replaces placeholder `ranaria`)                                            |
 | 12     | Supabase Auth: email/password + Google/GitHub, `profiles`, scores only with session |
+| 13     | Security basics: security headers, RLS audit, `rls_auto_enable()` RPC revoked       |
 
 Later fixes: the game-over screen has a REGRESAR option (back to the game page with leaderboard) and resets game state when leaving via REGRESAR or VOLVER AL VAULT.
 
@@ -61,7 +64,7 @@ This uses Next.js 16.4 / React 19.3, which differs from older Next.js APIs. `AGE
 - `next.config.ts` enables `cacheComponents`, `partialPrefetching` and `experimental.agentFeedback`. `cacheComponents` changes caching/rendering semantics: server reads use `"use cache"` + `cacheTag`, so check the docs before using data fetching or dynamic APIs.
 - Tailwind CSS v4 is wired through a Turbopack rule (`@tailwindcss/turbopack` loader for `*.css`) in `next.config.ts`, not PostCSS. Theme tokens (`--background`, `--foreground`, fonts) are defined in `app/globals.css` via `@theme inline`, with a dark-mode override.
 - `app/layout.tsx` uses the globally typed `LayoutProps<"/">` helper (no import) and loads Geist / Geist Mono through `next/font/google`.
-- `references/` holds design templates (`templates/`), original standalone games (`started-games/`: asteroids, tetris, arkanoid) and raw assets (`source-assets/`). They are source material, not app code. It also holds registries kept by the agents/skills: `game-suggestions-todo.md` (`game-planner`), `game-with-themes.md` (`skin-designer`), `mobile-ready.md` (`mobile-porter`) and `implemented-games.md` (catalog rows of the implemented games).
+- `references/` holds design templates (`templates/`), original standalone games (`started-games/`: asteroids, tetris, arkanoid) and raw assets (`source-assets/`). They are source material, not app code. It also holds registries kept by the agents/skills: `game-suggestions-todo.md` (`game-planner`), `game-with-themes.md` (`skin-designer`), `mobile-ready.md` (`mobile-porter`), `security/audit-log.md` and `security/security-checklist.md` (`security-auditor`) and `implemented-games.md` (catalog rows of the implemented games).
 
 ### Supabase
 
@@ -70,6 +73,7 @@ This uses Next.js 16.4 / React 19.3, which differs from older Next.js APIs. `AGE
 - Schema lives in `supabase/migrations/` (timestamped SQL): `games` table, `scores` table, `games_with_stats` view (adds `best` and `plays`), `profiles` table (`id` → `auth.users`, unique uppercase `username`, trigger `on_auth_user_created` fills it from signup metadata) with RLS. `scores` inserts are allowed only to `authenticated` users whose `name` equals their profile `username` (`scores_insert_own`). Each new game adds a migration (`*_game_<name>.sql`: tetris, arkanoid, snake, frogger) that replaces its placeholder row in `games` (same `id`).
 - Reads: `lib/games.ts` (`getGames`, tag `games`) and `lib/scores.ts` (`getTopScores`, tag `scores-<gameId>`); `lib/scores-query.ts` has the shared `queryTopScores` also used from the browser (hall of fame). After saving a score, call the server action `revalidateScores(gameId)` in `app/juegos/[id]/jugar/actions.ts` to invalidate both tags.
 - Auth: `proxy.ts` (with `lib/supabase/proxy.ts` `updateSession`) only refreshes session cookies; no route requires login, only saving a score does. `lib/session.tsx` wraps Supabase Auth: `useSession()` returns `{ user, status, signOut }` with `status` `loading | guest | needs-profile | ready`. `lib/auth.ts` holds username/password validation and Spanish error messages. `scores.name` is the profile `username` (no `user_id` yet). The Supabase dashboard must have Site URL/Redirect URLs, "Confirm email", min password 8 and the Google/GitHub providers configured (not versioned).
+- Security (spec 13): `next.config.ts` sets `securityHeaders` on every route (nosniff, `X-Frame-Options: DENY`, Referrer-Policy, HSTS without preload, Permissions-Policy); there is no CSP yet. RLS is on in `games`, `scores` and `profiles` with no `update`/`delete` policies; keep it that way and add RLS to every new table. `public.rls_auto_enable()` (event trigger `ensure_rls`) has `EXECUTE` revoked from `anon`/`authenticated`. Sign-up/sign-in rate limits per IP are set in the Supabase dashboard (not versioned). Leaked password protection is pending (needs the Pro plan). Checklist in `references/security/security-checklist.md`.
 
 ### Games
 
