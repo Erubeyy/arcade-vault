@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { LogoutConfirm } from "@/components/logout-confirm";
+import { UserBadge } from "@/components/user-badge";
 import { useSession } from "@/lib/session";
 
 export function Nav() {
   const pathname = usePathname();
   const { user, status, signOut } = useSession();
   const [open, setOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const isHome = pathname === "/";
   const isLibrary = pathname.startsWith("/biblioteca") || pathname.startsWith("/juegos");
@@ -38,13 +41,16 @@ export function Nav() {
           <span>CRÉDITOS · 03</span>
         </div>
         {status === "ready" && user ? (
-          <button className="btn ghost auth-btn" onClick={signOut} title="Cerrar sesión">
-            {user.username} · SALIR
-          </button>
+          <>
+            <UserBadge className="auth-btn" username={user.username!} avatarUrl={user.avatarUrl} />
+            <button className="btn danger auth-out" onClick={() => setConfirmOpen(true)} title="Cerrar sesión">
+              SALIR
+            </button>
+          </>
         ) : status === "needs-profile" ? (
           <>
             <Link className="btn auth-btn" href="/perfil/completar">COMPLETAR PERFIL</Link>
-            <button className="btn ghost auth-btn" onClick={signOut} title="Cerrar sesión">SALIR</button>
+            <button className="btn danger auth-out" onClick={() => setConfirmOpen(true)} title="Cerrar sesión">SALIR</button>
           </>
         ) : (
           <Link
@@ -66,11 +72,14 @@ export function Nav() {
         <Link className={isHall ? "active" : ""} href="/salon" onClick={close}>Salón de la Fama</Link>
         <Link className={isAbout ? "active" : ""} href="/about" onClick={close}>Acerca de</Link>
         {status === "ready" && user ? (
-          <a onClick={() => { close(); signOut(); }}>Cerrar sesión ({user.username})</a>
+          <>
+            <UserBadge username={user.username!} avatarUrl={user.avatarUrl} />
+            <a className="danger" onClick={() => { close(); setConfirmOpen(true); }}>Cerrar sesión</a>
+          </>
         ) : status === "needs-profile" ? (
           <>
             <Link href="/perfil/completar" onClick={close}>COMPLETAR PERFIL</Link>
-            <a onClick={() => { close(); signOut(); }}>Cerrar sesión</a>
+            <a className="danger" onClick={() => { close(); setConfirmOpen(true); }}>Cerrar sesión</a>
           </>
         ) : status === "guest" ? (
           <Link className={isAuth ? "active" : ""} href="/login" onClick={close}>Iniciar Sesión</Link>
@@ -80,6 +89,15 @@ export function Nav() {
           CRÉDITOS · 03
         </div>
       </aside>
+
+      <LogoutConfirm
+        open={confirmOpen}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={async () => {
+          await signOut();
+          setConfirmOpen(false);
+        }}
+      />
     </>
   );
 }
