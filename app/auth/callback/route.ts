@@ -13,10 +13,16 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const next = safeNext(searchParams.get("next"));
 
-  // Detrás de un proxy/balanceador el host público llega en x-forwarded-host.
+  // Detrás de un proxy/balanceador el host público llega en x-forwarded-host; solo se
+  // acepta si coincide con el host de SITE_URL (sin SITE_URL se usa siempre el origin).
   const forwardedHost = request.headers.get("x-forwarded-host");
-  const proto = request.headers.get("x-forwarded-proto") ?? "https";
-  const base = forwardedHost ? `${proto}://${forwardedHost}` : origin;
+  const siteHost = process.env.SITE_URL
+    ? new URL(process.env.SITE_URL).host
+    : null;
+  const base =
+    forwardedHost && forwardedHost === siteHost
+      ? `${request.headers.get("x-forwarded-proto") === "http" ? "http" : "https"}://${forwardedHost}`
+      : origin;
   const go = (path: string) => NextResponse.redirect(`${base}${path}`);
 
   if (!code) return go("/login?error=enlace");

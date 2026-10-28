@@ -30,7 +30,9 @@ npm run lint    # eslint (flat config, eslint.config.mjs)
 - `skin-designer` (project subagent, `.claude/agents/skin-designer.md`): `skin-designer: <game>` ensures ONE real game has at least 3 skins (`classic` as default, `neon`, `retro`), all readable in dark and light mode, with a selector in its options panel and persisted preferences; verifies with Playwright and records the result in `references/game-with-themes.md`.
 - `mobile-porter` (project subagent, `.claude/agents/mobile-porter.md`): `mobile-porter: <route or game>` audits and fixes ONE route or real game for mobile browsers (portrait and landscape, desktop untouched), using spec 10 as reference, verifies with Playwright at 375×667, 390×844, 844×390 and 1280×800, and records the result in `references/mobile-ready.md`. Browser only (no PWA/native).
 
-`game-planner`, `skin-designer` and `mobile-porter` use `memory: project`; their notes live in `.claude/agent-memory/<agent>/`.
+- `security-auditor` (project subagent, `.claude/agents/security-auditor.md`): `security-auditor: <db | app | todo | spec NN | rama>` audits Supabase (RLS, policies, grants, `SECURITY DEFINER`, advisors, logs, migration drift) and the Next.js app (secrets, headers, auth callback, server actions, XSS, `npm audit`) against specs 12–13. Read-only: proposes fixes, never applies them. Records findings in `references/security/audit-log.md` and keeps `security-checklist.md` current.
+
+`game-planner`, `skin-designer`, `mobile-porter` and `security-auditor` use `memory: project`; their notes live in `.claude/agent-memory/<agent>/`.
 
 ## Specs implemented
 
@@ -62,7 +64,7 @@ This uses Next.js 16.4 / React 19.3, which differs from older Next.js APIs. `AGE
 - `next.config.ts` enables `cacheComponents`, `partialPrefetching` and `experimental.agentFeedback`. `cacheComponents` changes caching/rendering semantics: server reads use `"use cache"` + `cacheTag`, so check the docs before using data fetching or dynamic APIs.
 - Tailwind CSS v4 is wired through a Turbopack rule (`@tailwindcss/turbopack` loader for `*.css`) in `next.config.ts`, not PostCSS. Theme tokens (`--background`, `--foreground`, fonts) are defined in `app/globals.css` via `@theme inline`, with a dark-mode override.
 - `app/layout.tsx` uses the globally typed `LayoutProps<"/">` helper (no import) and loads Geist / Geist Mono through `next/font/google`.
-- `references/` holds design templates (`templates/`), original standalone games (`started-games/`: asteroids, tetris, arkanoid) and raw assets (`source-assets/`). They are source material, not app code. It also holds registries kept by the agents/skills: `game-suggestions-todo.md` (`game-planner`), `game-with-themes.md` (`skin-designer`), `mobile-ready.md` (`mobile-porter`) and `implemented-games.md` (catalog rows of the implemented games).
+- `references/` holds design templates (`templates/`), original standalone games (`started-games/`: asteroids, tetris, arkanoid) and raw assets (`source-assets/`). They are source material, not app code. It also holds registries kept by the agents/skills: `game-suggestions-todo.md` (`game-planner`), `game-with-themes.md` (`skin-designer`), `mobile-ready.md` (`mobile-porter`), `security/audit-log.md` and `security/security-checklist.md` (`security-auditor`) and `implemented-games.md` (catalog rows of the implemented games).
 
 ### Supabase
 

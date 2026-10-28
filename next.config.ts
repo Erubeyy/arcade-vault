@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
   experimental: {
     agentFeedback: true,
   },
+  poweredByHeader: false,
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

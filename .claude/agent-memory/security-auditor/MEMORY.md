@@ -1,0 +1,1 @@
+- [Estado de auditorías](audit-state.md) — último ID (SEC-011), riesgos aceptados (A01-A04) y falsos positivos descartados
