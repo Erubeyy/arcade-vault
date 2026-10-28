@@ -1790,6 +1790,39 @@ html:has(.av-player.has-pad) {
   padding: 12px;
   font-size: 9px;
 }
+.auth-card .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.auth-soon {
+  margin-top: 8px;
+  text-align: center;
+  font-family: var(--pixel);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  color: var(--ink-faint);
+}
+.auth-msg {
+  margin: 0 0 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  overflow-wrap: anywhere;
+}
+.auth-msg strong {
+  color: var(--ink);
+}
+.auth-msg.error {
+  padding: 10px 12px;
+  border: 1px solid var(--magenta);
+  color: var(--magenta);
+}
+.auth-msg.ok {
+  padding: 10px 12px;
+  border: 1px solid var(--green);
+  color: var(--green);
+}
 
 /* ===== salón ===== */
 .av-hall {
