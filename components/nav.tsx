@@ -7,7 +7,7 @@ import { useSession } from "@/lib/session";
 
 export function Nav() {
   const pathname = usePathname();
-  const { user, signOut } = useSession();
+  const { user, status, signOut } = useSession();
   const [open, setOpen] = useState(false);
 
   const isHome = pathname === "/";
@@ -37,12 +37,23 @@ export function Nav() {
           <span className="coin"></span>
           <span>CRÉDITOS · 03</span>
         </div>
-        {user ? (
+        {status === "ready" && user ? (
           <button className="btn ghost auth-btn" onClick={signOut} title="Cerrar sesión">
-            {user.name} · SALIR
+            {user.username} · SALIR
           </button>
+        ) : status === "needs-profile" ? (
+          <>
+            <Link className="btn auth-btn" href="/perfil/completar">COMPLETAR PERFIL</Link>
+            <button className="btn ghost auth-btn" onClick={signOut} title="Cerrar sesión">SALIR</button>
+          </>
         ) : (
-          <Link className="btn auth-btn" href="/login">Iniciar Sesión</Link>
+          <Link
+            className="btn auth-btn"
+            href="/login"
+            style={status === "loading" ? { visibility: "hidden" } : undefined}
+          >
+            Iniciar Sesión
+          </Link>
         )}
         <button className="btn ghost hamburger" onClick={() => setOpen(true)} aria-label="Menú">≡</button>
       </nav>
@@ -54,11 +65,16 @@ export function Nav() {
         <Link className={isLibrary ? "active" : ""} href="/biblioteca" onClick={close}>Biblioteca</Link>
         <Link className={isHall ? "active" : ""} href="/salon" onClick={close}>Salón de la Fama</Link>
         <Link className={isAbout ? "active" : ""} href="/about" onClick={close}>Acerca de</Link>
-        {user ? (
-          <a onClick={() => { close(); signOut(); }}>Cerrar sesión ({user.name})</a>
-        ) : (
+        {status === "ready" && user ? (
+          <a onClick={() => { close(); signOut(); }}>Cerrar sesión ({user.username})</a>
+        ) : status === "needs-profile" ? (
+          <>
+            <Link href="/perfil/completar" onClick={close}>COMPLETAR PERFIL</Link>
+            <a onClick={() => { close(); signOut(); }}>Cerrar sesión</a>
+          </>
+        ) : status === "guest" ? (
           <Link className={isAuth ? "active" : ""} href="/login" onClick={close}>Iniciar Sesión</Link>
-        )}
+        ) : null}
         <div style={{ flex: 1 }}></div>
         <div className="pixel" style={{ fontSize: 9, color: "var(--ink-faint)", letterSpacing: "0.16em" }}>
           CRÉDITOS · 03

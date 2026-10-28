@@ -2,11 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useSession } from "@/lib/session";
 
 export function AuthForm() {
   const router = useRouter();
-  const { login } = useSession();
   const [tab, setTab] = useState<"in" | "up">("in");
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
@@ -14,12 +12,10 @@ export function AuthForm() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    login({ name: (user || "PLAYER1").toUpperCase().slice(0, 10) });
-    router.push("/biblioteca");
+    // Provisional: el paso 6 del SPEC 12 conecta el formulario con Supabase Auth.
   };
 
   const guest = () => {
-    login(null);
     router.push("/biblioteca");
   };
 

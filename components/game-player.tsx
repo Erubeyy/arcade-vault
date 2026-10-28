@@ -43,7 +43,7 @@ import { ArkanoidOptionsPanel } from "@/components/arkanoid-options";
 import { SnakeOptionsPanel } from "@/components/snake-options";
 import { FroggerOptionsPanel } from "@/components/frogger-options";
 import { TouchPad } from "@/components/touch-pad";
-import { useSession } from "@/lib/session";
+import { saveScore, useSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/client";
 import { revalidateScores } from "@/app/juegos/[id]/jugar/actions";
 
@@ -58,7 +58,7 @@ export function GamePlayer({
   gameId: string;
   title: string;
 }) {
-  const { user, saveScore } = useSession();
+  const { user } = useSession();
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState<number | undefined>(3);
   const [paused, setPaused] = useState(false);
@@ -104,7 +104,7 @@ export function GamePlayer({
     isFrogger ? loadFroggerPrefs() : FROGGER_DEFAULT_PREFS,
   );
 
-  const name = typedName ?? user?.name ?? "INVITADO";
+  const name = typedName ?? user?.username ?? "INVITADO";
   const level = isReal ? engineLevel : 1 + Math.floor(score / 2500);
 
   useEffect(() => {

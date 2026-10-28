@@ -1,11 +1,32 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type { Session } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 
 export interface User {
-  name: string;
+  id: string;
+  email: string | null;
+  username: string | null; // null = autenticado sin perfil
 }
 
+export type SessionStatus = "loading" | "guest" | "needs-profile" | "ready";
+
+interface SessionValue {
+  user: User | null;
+  status: SessionStatus;
+  signOut: () => Promise<void>;
+}
+
+// Copia local de marcas. Se mantiene solo hasta el paso 9 del SPEC 12, que la elimina.
 export interface SavedScore {
   game: string;
   score: number;
@@ -13,78 +34,75 @@ export interface SavedScore {
   at: number;
 }
 
-interface SessionValue {
-  user: User | null;
-  login: (user: User | null) => void;
-  signOut: () => void;
-  saveScore: (entry: Omit<SavedScore, "at">) => void;
-}
-
-const USER_KEY = "av_user";
 const SCORES_KEY = "av_scores";
 
-const listeners = new Set<() => void>();
-const notify = () => listeners.forEach((l) => l());
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  window.addEventListener("storage", listener);
-  return () => {
-    listeners.delete(listener);
-    window.removeEventListener("storage", listener);
-  };
-}
-
-function getSnapshot(): string | null {
+export function saveScore(entry: Omit<SavedScore, "at">) {
   try {
-    return localStorage.getItem(USER_KEY);
-  } catch {
-    return null;
-  }
+    const all: SavedScore[] = JSON.parse(
+      localStorage.getItem(SCORES_KEY) || "[]",
+    );
+    all.push({ ...entry, at: Date.now() });
+    localStorage.setItem(SCORES_KEY, JSON.stringify(all));
+  } catch {}
 }
 
-const getServerSnapshot = (): string | null => null;
+type State = { status: SessionStatus; user: User | null };
 
 const SessionContext = createContext<SessionValue | null>(null);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const raw = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const [supabase] = useState(() => createClient());
+  const [state, setState] = useState<State>({ status: "loading", user: null });
+  const loadId = useRef(0);
 
-  const user = useMemo<User | null>(() => {
-    if (!raw) return null;
-    try {
-      const parsed = JSON.parse(raw);
-      return typeof parsed?.name === "string" ? { name: parsed.name } : null;
-    } catch {
-      return null;
-    }
-  }, [raw]);
+  useEffect(() => {
+    const apply = async (session: Session | null) => {
+      const id = ++loadId.current;
+      if (!session) {
+        setState({ status: "guest", user: null });
+        return;
+      }
+      const { data } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", session.user.id)
+        .maybeSingle();
+      if (id !== loadId.current) return; // llegó una sesión más reciente
+      const username = data?.username ?? null;
+      setState({
+        status: username ? "ready" : "needs-profile",
+        user: {
+          id: session.user.id,
+          email: session.user.email ?? null,
+          username,
+        },
+      });
+    };
 
-  const login = useCallback((u: User | null) => {
-    try {
-      if (u) localStorage.setItem(USER_KEY, JSON.stringify(u));
-      else localStorage.removeItem(USER_KEY);
-    } catch {}
-    notify();
-  }, []);
+    // No se hacen llamadas a Supabase dentro del callback: se difieren para evitar bloqueos.
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setTimeout(() => void apply(session), 0);
+    });
+    return () => data.subscription.unsubscribe();
+  }, [supabase]);
 
-  const signOut = useCallback(() => login(null), [login]);
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
+  }, [supabase]);
 
-  const saveScore = useCallback((entry: Omit<SavedScore, "at">) => {
-    try {
-      const all: SavedScore[] = JSON.parse(localStorage.getItem(SCORES_KEY) || "[]");
-      all.push({ ...entry, at: Date.now() });
-      localStorage.setItem(SCORES_KEY, JSON.stringify(all));
-    } catch {}
-  }, []);
+  const value = useMemo(
+    () => ({ user: state.user, status: state.status, signOut }),
+    [state, signOut],
+  );
 
-  const value = useMemo(() => ({ user, login, signOut, saveScore }), [user, login, signOut, saveScore]);
-
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return (
+    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+  );
 }
 
 export function useSession(): SessionValue {
   const ctx = useContext(SessionContext);
-  if (!ctx) throw new Error("useSession debe usarse dentro de <SessionProvider>");
+  if (!ctx)
+    throw new Error("useSession debe usarse dentro de <SessionProvider>");
   return ctx;
 }
