@@ -46,6 +46,7 @@ npm run lint    # eslint (flat config, eslint.config.mjs)
 | 09     | Snake (replaces placeholder `serpentina`)                                     |
 | 10     | Touch controls: virtual gamepad (d-pad + A/B) under the canvas                |
 | 11     | Frogger (replaces placeholder `ranaria`)                                      |
+| 12     | Supabase Auth: email/password + Google/GitHub, `profiles`, scores only with session |
 
 Later fixes: the game-over screen has a REGRESAR option (back to the game page with leaderboard) and resets game state when leaving via REGRESAR or VOLVER AL VAULT.
 
@@ -56,7 +57,7 @@ This uses Next.js 16.4 / React 19.3, which differs from older Next.js APIs. `AGE
 ## Architecture notes
 
 - App Router only (`app/`). Path alias `@/*` maps to the repo root.
-- Routes: `/` (home), `/about` (contact form, server action `app/about/actions.ts` sends mail via Resend), `/biblioteca` (catalog), `/juegos/[id]` (game detail + leaderboard), `/juegos/[id]/jugar` (player), `/salon` (hall of fame), `/login`.
+- Routes: `/` (home), `/about` (contact form, server action `app/about/actions.ts` sends mail via Resend), `/biblioteca` (catalog), `/juegos/[id]` (game detail + leaderboard), `/juegos/[id]/jugar` (player), `/salon` (hall of fame), `/login` (sign in / sign up / OAuth / guest), `/perfil/completar` (username for OAuth users without profile), `/recuperar` + `/restablecer` (password reset), `/auth/callback` (route handler: exchanges the PKCE `code`, only internal `next`).
 - `next.config.ts` enables `cacheComponents`, `partialPrefetching` and `experimental.agentFeedback`. `cacheComponents` changes caching/rendering semantics: server reads use `"use cache"` + `cacheTag`, so check the docs before using data fetching or dynamic APIs.
 - Tailwind CSS v4 is wired through a Turbopack rule (`@tailwindcss/turbopack` loader for `*.css`) in `next.config.ts`, not PostCSS. Theme tokens (`--background`, `--foreground`, fonts) are defined in `app/globals.css` via `@theme inline`, with a dark-mode override.
 - `app/layout.tsx` uses the globally typed `LayoutProps<"/">` helper (no import) and loads Geist / Geist Mono through `next/font/google`.
@@ -66,9 +67,9 @@ This uses Next.js 16.4 / React 19.3, which differs from older Next.js APIs. `AGE
 
 - Project is connected through `.mcp.json` (Supabase MCP, project-scoped) and env vars in `.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_DB_PASSWORD`, plus `RESEND_API_KEY` and `CONTACT_TO_EMAIL` for the contact form. Never commit or print them.
 - Clients in `lib/supabase/`: `server.ts` (`createClient`, cookie-based, for request-time code), `public.ts` (`createPublicClient`, cookie-less, safe inside `"use cache"`), `client.ts` (browser). Types in `database.types.ts` (`Database`).
-- Schema lives in `supabase/migrations/` (timestamped SQL): `games` table, `scores` table, `games_with_stats` view (adds `best` and `plays`) with RLS. Each new game adds a migration (`*_game_<name>.sql`: tetris, arkanoid, snake, frogger) that replaces its placeholder row in `games` (same `id`).
+- Schema lives in `supabase/migrations/` (timestamped SQL): `games` table, `scores` table, `games_with_stats` view (adds `best` and `plays`), `profiles` table (`id` → `auth.users`, unique uppercase `username`, trigger `on_auth_user_created` fills it from signup metadata) with RLS. `scores` inserts are allowed only to `authenticated` users whose `name` equals their profile `username` (`scores_insert_own`). Each new game adds a migration (`*_game_<name>.sql`: tetris, arkanoid, snake, frogger) that replaces its placeholder row in `games` (same `id`).
 - Reads: `lib/games.ts` (`getGames`, tag `games`) and `lib/scores.ts` (`getTopScores`, tag `scores-<gameId>`); `lib/scores-query.ts` has the shared `queryTopScores` also used from the browser (hall of fame). After saving a score, call the server action `revalidateScores(gameId)` in `app/juegos/[id]/jugar/actions.ts` to invalidate both tags.
-- `lib/session.tsx` is a client-side localStorage session (`av_user`, `av_scores`) used by the mock login; scores are saved to Supabase.
+- Auth: `proxy.ts` (with `lib/supabase/proxy.ts` `updateSession`) only refreshes session cookies; no route requires login, only saving a score does. `lib/session.tsx` wraps Supabase Auth: `useSession()` returns `{ user, status, signOut }` with `status` `loading | guest | needs-profile | ready`. `lib/auth.ts` holds username/password validation and Spanish error messages. `scores.name` is the profile `username` (no `user_id` yet). The Supabase dashboard must have Site URL/Redirect URLs, "Confirm email", min password 8 and the Google/GitHub providers configured (not versioned).
 
 ### Games
 
