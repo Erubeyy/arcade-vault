@@ -26,26 +26,6 @@ interface SessionValue {
   signOut: () => Promise<void>;
 }
 
-// Copia local de marcas. Se mantiene solo hasta el paso 9 del SPEC 12, que la elimina.
-export interface SavedScore {
-  game: string;
-  score: number;
-  name: string;
-  at: number;
-}
-
-const SCORES_KEY = "av_scores";
-
-export function saveScore(entry: Omit<SavedScore, "at">) {
-  try {
-    const all: SavedScore[] = JSON.parse(
-      localStorage.getItem(SCORES_KEY) || "[]",
-    );
-    all.push({ ...entry, at: Date.now() });
-    localStorage.setItem(SCORES_KEY, JSON.stringify(all));
-  } catch {}
-}
-
 type State = { status: SessionStatus; user: User | null };
 
 const SessionContext = createContext<SessionValue | null>(null);

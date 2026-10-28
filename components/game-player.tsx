@@ -43,7 +43,7 @@ import { ArkanoidOptionsPanel } from "@/components/arkanoid-options";
 import { SnakeOptionsPanel } from "@/components/snake-options";
 import { FroggerOptionsPanel } from "@/components/frogger-options";
 import { TouchPad } from "@/components/touch-pad";
-import { saveScore, useSession } from "@/lib/session";
+import { useSession } from "@/lib/session";
 import { createClient } from "@/lib/supabase/client";
 import { revalidateScores } from "@/app/juegos/[id]/jugar/actions";
 
@@ -58,14 +58,12 @@ export function GamePlayer({
   gameId: string;
   title: string;
 }) {
-  const { user } = useSession();
+  const { user, status } = useSession();
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState<number | undefined>(3);
   const [paused, setPaused] = useState(false);
   const [over, setOver] = useState(false);
-  const [typedName, setTypedName] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const localSaved = useRef(false); // evita duplicar la copia local en av_scores al reintentar
   const [engineLevel, setEngineLevel] = useState(1);
   const abandoned = useRef(false);
   const canvasRef = useRef<GameCanvasHandle>(null);
@@ -104,7 +102,7 @@ export function GamePlayer({
     isFrogger ? loadFroggerPrefs() : FROGGER_DEFAULT_PREFS,
   );
 
-  const name = typedName ?? user?.username ?? "INVITADO";
+  const name = user?.username ?? "INVITADO";
   const level = isReal ? engineLevel : 1 + Math.floor(score / 2500);
 
   useEffect(() => {
@@ -200,7 +198,6 @@ export function GamePlayer({
     setPaused(false);
     setOver(false);
     setSaveState("idle");
-    localSaved.current = false;
   };
 
   // Al volver a la página (los efectos se reejecutan al reaparecer desde la caché)
@@ -222,10 +219,7 @@ export function GamePlayer({
   };
 
   const handleSave = async () => {
-    if (!localSaved.current) {
-      saveScore({ game: gameId, score, name });
-      localSaved.current = true;
-    }
+    if (!user?.username) return; // sin perfil no se guarda (la RLS también lo rechaza)
     if (!isReal) {
       setSaveState("saved");
       return;
@@ -235,7 +229,7 @@ export function GamePlayer({
       .from("scores")
       .insert({
         game_id: gameId,
-        name: name.trim().toUpperCase().slice(0, 10),
+        name: user.username,
         score,
       });
     if (error) {
@@ -407,15 +401,10 @@ export function GamePlayer({
             <h2>FIN DEL JUEGO</h2>
             <div className="final-label">PUNTUACIÓN FINAL</div>
             <div className="final">{fmt(score)}</div>
-            {saveState !== "saved" ? (
+            {saveState === "saved" ? (
+              <div className="toast-saved">▸ PUNTUACIÓN GUARDADA_</div>
+            ) : status === "ready" ? (
               <div className="input-row">
-                <input
-                  value={name}
-                  onChange={(e) =>
-                    setTypedName(e.target.value.toUpperCase().slice(0, 10))
-                  }
-                  placeholder="TUS INICIALES"
-                />
                 <button
                   className="btn yellow"
                   onClick={handleSave}
@@ -428,16 +417,26 @@ export function GamePlayer({
                       : "GUARDAR PUNTUACIÓN"}
                 </button>
               </div>
+            ) : status === "needs-profile" ? (
+              <Link
+                className="btn yellow"
+                href="/perfil/completar"
+                onClick={abandon}
+              >
+                COMPLETA TU PERFIL PARA GUARDAR TU MARCA
+              </Link>
             ) : (
-              <div className="toast-saved">▸ PUNTUACIÓN GUARDADA_</div>
+              <Link className="btn yellow" href="/login" onClick={abandon}>
+                INICIA SESIÓN PARA GUARDAR TU MARCA
+              </Link>
             )}
             {saveState === "error" && (
               <div
                 role="alert"
                 style={{ color: "var(--magenta)", fontSize: 12, marginTop: 10 }}
               >
-                No se pudo guardar en el ranking. Tu marca sigue en este
-                dispositivo; revisa tu conexión y reintenta.
+                No se pudo guardar en el ranking. Revisa tu conexión y
+                reintenta.
               </div>
             )}
             <div className="actions">
