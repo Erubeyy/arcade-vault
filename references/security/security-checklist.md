@@ -28,4 +28,4 @@ Estado según SPEC 13; última verificación por `security-auditor`: base de dat
 - [x] Event trigger `ensure_rls` y trigger `on_auth_user_created` activos.
 - [x] Vista `games_with_stats` con `security_invoker = true`.
 - [ ] Grants mínimos: quitar DML de `anon`/`authenticated` sobre `games_with_stats` (SEC-002), `insert` de `anon` en `scores` (SEC-003) y limitar el insert por columnas sin `created_at` (SEC-004).
-- [ ] Historial de migraciones remoto alineado con `supabase/migrations/` (SEC-001).
+- [x] Historial de migraciones de dev alineado con `supabase/migrations/` (SEC-001): 10 versiones, incluida `20261028035000` (registrada sin ejecutar el DDL, que ya existía en dev). Producción lo registra `01_schema.sql`.
